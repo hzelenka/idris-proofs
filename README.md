@@ -1,3 +1,3 @@
 # Idris Mathematical Proofs
 
-A collection of Idris files (just one so far) proving important concepts in mathematics.
+A collection of Idris files proving important concepts in mathematics or whatever I feel like.

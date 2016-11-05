@@ -1,5 +1,7 @@
 module Groups
 
+import Functions
+
 ||| Algebraic group with the properties:
 ||| (1) closure (2) identity (3) invertibility (4) associativity
 data Group : (a -> a -> a) -> Type where
@@ -29,3 +31,9 @@ data AbelianGroup : (a -> a -> a) -> Type where
                             (y : a) ->
                             x `op` y = y `op` x)) ->
           AbelianGroup op
+
+data Subgroup : {a : Type} ->
+                {op : a -> a -> a} ->
+                (Group op) ->
+                (constaint : a -> Bool) ->
+                Type where

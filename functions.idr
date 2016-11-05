@@ -1,5 +1,6 @@
 module Functions
 
+%access public export
 %default total
 
 data Injective : (domain -> codomain) -> Type where
