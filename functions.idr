@@ -1,5 +1,7 @@
 module Functions
 
+import Data.Fin
+
 %access public export
 %default total
 
@@ -22,6 +24,36 @@ data Bijective : (a -> b) -> Type where
         Injective f ->
         Surjective f ->
         Bijective f
+
+||| Data type for having the same cardinality
+data (~=) : Type -> Nat -> Type where
+  ||| Short for equipotent
+  Equi : (a : Type) ->
+         (n : Nat) ->
+         (bij : (f : (a -> Fin n) ** Bijective f)) ->
+         (~=) a n
+
+data LeftInv : (domain -> codomain) -> (codomain -> domain) -> Type where
+  LInv : (f : domain -> codomain) ->
+         (g : codomain -> domain) ->
+         ((x : domain) ->
+          (g (f x) = x)) ->
+         LeftInv f g
+
+data RightInv : (domain -> codomain) -> (codomain -> domain) -> Type where
+  RInv : (f : domain -> codomain) ->
+         (g : codomain -> domain) ->
+         ((y : codomain) ->
+          (f (g y) = y)) ->
+         RightInv f g
+
+left_inv_inj : (Injective f -> (g : (codomain -> domain) ** LeftInv f g),
+                (g : (codomain -> domain) ** LeftInv f g) -> Injective f)
+left_inv_inj = (fwd, bwd) where
+  fwd : Injective f -> (g : (codomain -> domain) ** LeftInv f g)
+  fwd (Inj f prf) = ?fwd_hole
+  bwd : (g : (codomain -> domain) ** LeftInv f g) -> Injective f
+  bwd (g ** (LInv f g prf)) = ?bwd_hole
 
 interface Inhabited t where
   inhabited : t
