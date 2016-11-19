@@ -2,66 +2,77 @@ module Groups
 
 import Functions
 
-||| Useful shorthand for later
-data Id : a -> (a -> a -> a) -> Type where
-  ||| Need to check inverse at the same time
-  IdPrf : {a : Type} ->
-          (op : a -> a -> a) ->
-          (e : a ** (x : a) ->
-                    ((x `op` e = x,
-                      e `op` x = x),
-                    (x `op` x' = e,
-                     x' `op` x = e))) ->
-          Id e op
+%default total
 
-||| Algebraic group with the properties:
-||| (1) closure (2) identity (3) invertibility (4) associativity
-data Group : (a -> a -> a) -> Type where
-  ||| Closure is guaranteed by the type signature of op
-  MkGrp : (op : a -> a -> a) ->
-          Id e op ->
-          (associativity : ((x1 : a) ->
-                            (x2 : a) ->
-                            (x3 : a) ->
-                            (x1 `op` x2) `op` x3 = x1 `op` (x2 `op` x3))) ->
-          Group op
+interface Group (a : Type) (op : a -> a -> a) (e : a) (inv : a -> a) where
+  associativity : (x : a) ->
+                  (y : a) ->
+                  (z : a) ->
+                  (x `op` y) `op` z = x `op` (y `op` z)
+  identity : (x : a) ->
+             (x `op` e = x,
+              e `op` x = x)
+  inverse : (x : a) ->
+             (x `op` (inv x) = e,
+              (inv x) `op` x = e)
 
--- Get the identity element out of a group
-e : {op : a -> a -> a} -> Group op -> a
-e (MkGrp _ (IdPrf _ (id_elem ** _)) _) = id_elem
+id_unique : Group a op e inv =>
+            (e' : a) ->
+            ((x : a) ->
+             (x `op` e' = x,
+              e' `op` x = x)) ->
+            e = e'
+id_unique {op} {e} {inv} e' prf = trans (sym eq_prf_1) eq_prf_2 where
+  eq_prf_1 : e `op` e' = e
+  eq_prf_1 = fst $ prf e
+  eq_prf_2 : e `op` e' = e'
+  eq_prf_2 = snd $ identity {inv} e'
 
-id_unique : {op : a -> a -> a} ->
-            (g : Group op) ->
-            {e1 : a} ->
-            {e2 : a} ->
-            Id e1 op ->
-            Id e2 op ->
-            e1 = e2
-id_unique gp (IdPrf _ (x ** eq_fn_1)) (IdPrf _ (y ** eq_fn_2)) =
-  let eq_pf_1 = fst $ fst $ eq_fn_1 y
-      eq_pf_2 = sym $ snd $ fst $ eq_fn_2 x
-      eq_pf_3 = trans eq_pf_2 eq_pf_1
-  in ?id_hole
+cancel_left : Group a op e inv =>
+              (x : a) ->
+              (y : a) ->
+              (z : a) ->
+              x `op` y = x `op` z ->
+              y = z             
+cancel_left {op} {e} {inv} x y z xy_eq_xz = exact where
+  exact = let left     = associativity {op} {e} {inv} (inv x) x y
+              right    = associativity {op} {e} {inv} (inv x) x z
+              elim_inv = sym $ snd $ inverse {op} {e} {inv} x
+              elim_e_l = sym $ snd $ identity {op} {e} {inv} y
+              elim_e_r = sym $ snd $ identity {op} {e} {inv} z in
+              rewrite elim_e_l in
+              rewrite elim_e_r in
+              rewrite elim_inv in
+              rewrite left in 
+              rewrite right in 
+              cong xy_eq_xz
 
-||| Group that also has commutativity for all elements
-data AbelianGroup : (a -> a -> a) -> Type where
-  ||| Check it's a group, then that it has commutativity
-  MkAbl : (op : a -> a -> a) ->
-          Group op ->
-          (commutativity : ((x : a) ->
-                            (y : a) ->
-                            x `op` y = y `op` x)) ->
-          AbelianGroup op
+{- cancel_right : Group a op e inv =>
+               (x : a) ->
+               (y : a) ->
+               (z : a) ->
+               y `op` x = z `op` x ->
+               y = z             
+cancel_right {op} {e} {inv} x y z yx_eq_zx = exact where
+  exact = let left     = sym $ associativity {op} {e} {inv} y x (inv x)
+              right    = sym $ associativity {op} {e} {inv} z x (inv x)
+              elim_inv = sym $ fst $ inverse {op} {e} {inv} x
+              elim_e_l = sym $ fst $ identity {op} {e} {inv} y
+              elim_e_r = sym $ fst $ identity {op} {e} {inv} z in
+              rewrite elim_e_l in
+              rewrite elim_e_r in
+              rewrite elim_inv in
+              rewrite left in 
+              rewrite right in 
+                      cong {f=(\v => op v (inv x))} yx_eq_zx -}
 
-data Subgroup : {a : Type} ->
-                {op : a -> a -> a} ->
-                (g : Group op) ->
-                (constaint : a -> Bool) ->
-                Type where
-  MkSubgp : (g : Group op) ->
-            (c : a -> Bool) ->
-            (identity : c (e g) = True) ->
-            (closure : (x : a ** c x = True) ->
-                       (y : a ** c y = True) ->
-                       (c (x `op` y) = True)) ->
-            Subgroup g constraint
+inv_unique : Group a op e inv =>
+             (x : a) ->
+             (x' : a) ->
+             (x `op` x' = e,
+              x' `op` x = e) ->
+             x' = inv x
+
+inv_sym : Group a op e inv =>
+          inv x = x' ->
+          inv x' = x
