@@ -6,6 +6,7 @@ import Foundations.Functions
 %access public export
 %hide Prelude.Algebra.(<+>)
 
+infixl 6 <+>
 interface Group a where
   (<+>) : a -> a -> a
   zero : a
@@ -20,6 +21,20 @@ interface Group a where
   inverse : (x : a) ->
              (x <+> (neg x) = zero,
               (neg x) <+> x = zero)
+
+-- Use the group operation a certain number of times
+infixr 8 <^>
+(<^>) : Group a => a -> Nat -> a
+_ <^> Z = zero
+x <^> (S k) = x <+> (x <^> k)
+
+-- Powers of the identity are always equal to the identity
+power_of_zero : Group a =>
+                (n : Nat) ->
+                (zero {a}) <^> n = zero {a}
+power_of_zero Z = Refl
+power_of_zero {a} (S k) = let rec = power_of_zero {a} k in
+                              rewrite rec in fst $ identity zero
 
 -- The identity element in a group is unique
 id_unique : Group a =>
