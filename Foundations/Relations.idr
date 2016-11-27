@@ -6,9 +6,18 @@ module Foundations
 Relation : (a : Type) -> Type
 Relation a = a -> a -> Type
 
+-- Both LinearOrder and PartialOrder (implicitly TotalOrder as well) have
+-- double negative elimination, which is necessary later to prove that linear
+-- and total orders are the negation of one another. This approach seems more
+-- "honest" than using believe_me.
+
 data LinearOrder : Relation a ->
                    Type where
   IsLinear : (r : Relation a) ->
+             (double_neg : (x : a) ->
+                           (y : a) ->
+                           Not (Not (x `r` y)) ->
+                           x `r` y) ->
              (irreflexivity : (x : a) ->
                               Not (x `r` x)) ->
              (asymmetry : (x : a) ->
@@ -35,6 +44,10 @@ data LinearOrder : Relation a ->
 data PartialOrder : Relation a ->
                     Type where
   IsPartial : (r : Relation a) ->
+              (double_neg : (x : a) ->
+                           (y : a) ->
+                           Not (Not (x `r` y)) ->
+                           x `r` y) ->
               (reflexivity : (x : a) ->
                              x `r` x) ->
               (transitivity : (x : a) ->
@@ -62,17 +75,34 @@ data TotalOrder : Relation a ->
 not_linear_total : (r : Relation a) ->
                    LinearOrder r ->
                    TotalOrder (\x, y => Not (r x y))
-not_linear_total {a} r (IsLinear r irf asm trs cmp con) =
-  IsTotal q (IsPartial q rfl' trs' asm') ttl' where
+not_linear_total r (IsLinear r dng irf asm trs cmp con) =
+  IsTotal q (IsPartial q dng' rfl' trs' asm') ttl' where
     q : Relation a
     q = (\x, y => Not (r x y))
-    rfl' : (x : a) -> x `q` x
     rfl' = irf
-    trs' : (x : a) -> (y : a) -> (z : a) -> (x `q` y) -> (y `q` z) -> (x `q` z)
     trs' x y z x_q_y y_q_z x_r_z with (cmp x z x_r_z y)
       | Left x_r_y  = x_q_y x_r_y
       | Right y_r_z = y_q_z y_r_z
-    asm' : (x : a) -> (y : a) -> x `q` y -> y `q` x -> x = y
     asm' = con
-    ttl' : (x : a) -> (y : a) -> Either (x `q` y) (y `q` x)
     ttl' x y = ?ttl_hole
+    dng' x y contra x_r_y = ?dng_hole
+
+not_total_linear : (r : Relation a) ->
+                   TotalOrder r ->
+                   LinearOrder (\x, y => Not (r x y))
+not_total_linear r (IsTotal r (IsPartial r dng rfl trs ans) ttl) =
+  IsLinear q dng' irf asm trs' cmp con where
+    q : Relation a
+    q = (\x, y => Not (r x y))
+    irf x x_r_x = x_r_x $ rfl x
+    asm x y (x_r_y_void, y_r_x_void) with (ttl x y)
+      | Left x_r_y  = x_r_y_void x_r_y
+      | Right y_r_x = y_r_x_void y_r_x
+    trs' x y z x_r_y_void y_r_z_void x_r_z with (ttl x y)
+      | Left x_r_y  = x_r_y_void x_r_y
+      | Right y_r_x = y_r_z_void $ trs y x z y_r_x x_r_z
+    cmp x z x_r_z_void y with (ttl x z)
+      | Left x_r_z  = ?x_hole
+      | Right z_r_x = ?z_hole
+    con = ?con_hole
+    dng' = ?dng_hole
