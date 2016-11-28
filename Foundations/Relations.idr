@@ -1,4 +1,4 @@
-module Foundations
+module Relations
 
 %default total
 %access public export
@@ -6,18 +6,14 @@ module Foundations
 Relation : (a : Type) -> Type
 Relation a = a -> a -> Type
 
--- Both LinearOrder and PartialOrder (implicitly TotalOrder as well) have
--- double negative elimination, which is necessary later to prove that linear
--- and total orders are the negation of one another. This approach seems more
--- "honest" than using believe_me.
+-- Note that relations need to be decidable for some proofs later
 
 data LinearOrder : Relation a ->
                    Type where
   IsLinear : (r : Relation a) ->
-             (double_neg : (x : a) ->
-                           (y : a) ->
-                           Not (Not (x `r` y)) ->
-                           x `r` y) ->
+             (decidable : (x : a) ->
+                          (y : a) ->
+                          Dec (x `r` y)) ->
              (irreflexivity : (x : a) ->
                               Not (x `r` x)) ->
              (asymmetry : (x : a) ->
@@ -44,10 +40,9 @@ data LinearOrder : Relation a ->
 data PartialOrder : Relation a ->
                     Type where
   IsPartial : (r : Relation a) ->
-              (double_neg : (x : a) ->
+              (decidable : (x : a) ->
                            (y : a) ->
-                           Not (Not (x `r` y)) ->
-                           x `r` y) ->
+                           Dec (x `r` y)) ->
               (reflexivity : (x : a) ->
                              x `r` x) ->
               (transitivity : (x : a) ->
@@ -66,7 +61,7 @@ data PartialOrder : Relation a ->
 data TotalOrder : Relation a ->
                   Type where
   IsTotal : (r : Relation a) ->
-            (already_partial : PartialOrder r) ->
+            (already_partial : PartialOrder r) -> -- NB: decidability in here
             (totality : (x : a) ->
                         (y : a) ->
                         Either (x `r` y) (y `r` x)) ->
@@ -75,8 +70,8 @@ data TotalOrder : Relation a ->
 not_linear_total : (r : Relation a) ->
                    LinearOrder r ->
                    TotalOrder (\x, y => Not (r x y))
-not_linear_total r (IsLinear r dng irf asm trs cmp con) =
-  IsTotal q (IsPartial q dng' rfl' trs' asm') ttl' where
+not_linear_total r (IsLinear r dec irf asm trs cmp con) =
+  IsTotal q (IsPartial q dec' rfl' trs' asm') ttl' where
     q : Relation a
     q = (\x, y => Not (r x y))
     rfl' = irf
@@ -84,25 +79,39 @@ not_linear_total r (IsLinear r dng irf asm trs cmp con) =
       | Left x_r_y  = x_q_y x_r_y
       | Right y_r_z = y_q_z y_r_z
     asm' = con
-    ttl' x y = ?ttl_hole
-    dng' x y contra x_r_y = ?dng_hole
+    ttl' x y with (dec x y)
+      | Yes prf with (dec y x)
+        | Yes prf'   = absurd $ asm x y (prf, prf')
+        | No contra' = Right contra'
+      | No contra = Left contra
+    dec' x y with (dec x y)
+      | Yes prf   = No (\contra => contra prf) -- Introduce double negative
+      | No contra = Yes contra
 
 not_total_linear : (r : Relation a) ->
                    TotalOrder r ->
                    LinearOrder (\x, y => Not (r x y))
-not_total_linear r (IsTotal r (IsPartial r dng rfl trs ans) ttl) =
-  IsLinear q dng' irf asm trs' cmp con where
+not_total_linear r (IsTotal r (IsPartial r dec rfl trs ans) ttl) =
+  IsLinear q dec' irf' asm' trs' cmp' con' where
     q : Relation a
     q = (\x, y => Not (r x y))
-    irf x x_r_x = x_r_x $ rfl x
-    asm x y (x_r_y_void, y_r_x_void) with (ttl x y)
+    irf' x x_r_x = x_r_x $ rfl x
+    asm' x y (x_r_y_void, y_r_x_void) with (ttl x y)
       | Left x_r_y  = x_r_y_void x_r_y
       | Right y_r_x = y_r_x_void y_r_x
     trs' x y z x_r_y_void y_r_z_void x_r_z with (ttl x y)
       | Left x_r_y  = x_r_y_void x_r_y
       | Right y_r_x = y_r_z_void $ trs y x z y_r_x x_r_z
-    cmp x z x_r_z_void y with (ttl x z)
-      | Left x_r_z  = ?x_hole
-      | Right z_r_x = ?z_hole
-    con = ?con_hole
-    dng' = ?dng_hole
+    cmp' x z x_r_z_void y with (dec x y)
+      | Yes prf with (dec y z)
+        | Yes prf'   = absurd $ x_r_z_void $ trs x y z prf prf'
+        | No contra' = Right contra'
+      | No contra = Left contra
+    con' x y r_x_y_dbl_neg r_y_x_dbl_neg with (dec x y)
+      | Yes prf with (dec y x)
+        | Yes prf'   = ans x y prf prf'
+        | No contra' = absurd $ r_y_x_dbl_neg contra'
+      | No contra = absurd $ r_x_y_dbl_neg contra
+    dec' x y with (dec x y)
+      | Yes prf   = No (\contra => contra prf) -- Introduce double negative
+      | No contra = Yes contra
