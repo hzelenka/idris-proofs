@@ -3,13 +3,14 @@ module Sets
 %default total
 %access public export
 
-Set : (a : Type) -> Type
-Set a = (prop : ((x : a) -> Type) ** (el : a) ->
-                                  Dec (prop el))
+record Set a where
+  constructor MkSet
+  prop : (x : a) -> Type
+  dec : (x : a) -> Dec (prop x)
 
 compl : Set a -> Set a
-compl s = ((\x => Not (fst s x)) ** compl_prf) where
-  compl_prf el with (snd s el)
+compl s = MkSet (\x => Not (prop s x)) dec_prf where
+  dec_prf x with (dec s x)
     | Yes prf   = No (\contra => contra prf)
     | No contra = Yes contra
 
@@ -20,7 +21,7 @@ data (#) : a ->
            Type where
   IsElem : (x : a) ->
            (s : Set a) ->
-           (fst s) x ->
+           prop s x ->
            x # s
 
 -- Subset
@@ -53,8 +54,8 @@ data (:=:) : Set a ->
 -- Union
 infixl 5 \/
 (\/) : Set a -> Set a -> Set a
-p \/ q = ((\x => Either (fst p x) (fst q x)) ** dec_prf') where
-  dec_prf' el with (snd p el, snd q el)
+p \/ q = MkSet (\x => Either (prop p x) (prop q x)) dec_prf where
+  dec_prf el with (dec p el, dec q el)
     | (Yes p_prf, Yes q_prf)     = Yes $ Left p_prf
     | (Yes p_prf, No q_contra)   = Yes $ Left p_prf
     | (No p_contra, Yes q_prf)   = Yes $ Right q_prf
@@ -65,8 +66,8 @@ p \/ q = ((\x => Either (fst p x) (fst q x)) ** dec_prf') where
 -- Intersection
 infixl 6 /\
 (/\) : Set a -> Set a -> Set a
-p /\ q = ((\x => (fst p x, fst q x)) ** dec_prf') where
-  dec_prf' el with (snd p el, snd q el)
+p /\ q = MkSet (\x => (prop p x, prop q x)) dec_prf where
+  dec_prf el with (dec p el, dec q el)
     | (Yes p_prf, Yes q_prf)     = Yes (p_prf, q_prf)
     | (Yes p_prf, No q_contra)   = No (\(_,q) => q_contra q)
     | (No p_contra, Yes q_prf)   = No (\(p, _) => p_contra p)
@@ -81,7 +82,7 @@ de_morgan_1 : (x : a) ->
               (q : Set a) ->
               x # compl p /\ compl q ->
               x # compl (p \/ q)
-de_morgan_1 x (prop_p ** dec_p) (prop_q ** dec_q) (IsElem _ _ _)
+de_morgan_1 x (MkSet prop_p dec_p) (MkSet prop_q dec_q) (IsElem x _ prf)
   with (dec_p x, dec_q x)
     | (Yes p_prf, Yes q_prf)     = ?yy_hole
     | (Yes p_prf, No q_contra)   = ?yn_hole
@@ -105,7 +106,7 @@ de_morgan_4 : (x : a) ->
               (q : Set a) ->
               x # compl (p /\ q) ->
               x # compl p \/ compl q
-de_morgan_4 x (prop_p ** dec_p) (prop_q ** dec_q) (IsElem x (compl _) prf)
+de_morgan_4 x (MkSet prop_p dec_p) (MkSet prop_q dec_q) (IsElem x _ prf)
   with (dec_p x, dec_q x)
     | (Yes p_prf, Yes q_prf)     = absurd $ prf (p_prf, q_prf)
     | (Yes p_prf, No q_contra)   = ?hole_2
