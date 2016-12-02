@@ -42,3 +42,14 @@ subgroup_contains_zero (IsSubgroup r (nonempty ** restr) op_cl neg_cl) =
 kernel_subgroup : (Group a, Group b) =>
                   (sigma_hom : (hom : (a -> b) ** Homomorphism hom)) ->
                   Subgroup (Kernel sigma_hom)
+kernel_subgroup {a} {b} sigma_hom = IsSubgroup {a} _ nonempty op_cls ?neg_cls where
+  nonempty : (x : a ** Kernel sigma_hom x)
+  nonempty = (zero ** zero_in_kernel _)
+  op_cls : (Group a, Group b) =>
+           (x : a) ->
+           Kernel sigma_hom x ->
+           (y : a) ->
+           Kernel sigma_hom y ->
+           Kernel sigma_hom (x <+> y)
+  op_cls x x_zero y y_zero = ?op_hole --op_hole x_zero y_zero
+  {-neg_cls = ?neg_hole -}
