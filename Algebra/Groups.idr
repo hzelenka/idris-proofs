@@ -104,6 +104,19 @@ cancel_right x y z yx_eq_zx =
       apply_cong where
   apply_cong = (cong {f=(\val => val <+> (neg x))} yx_eq_zx)
 
+operate_eq : Group a =>
+             (w : a) ->
+             (x : a) ->
+             (y : a) ->
+             (z : a) ->
+             w = x ->
+             y = z ->
+             w <+> y = x <+> z
+operate_eq w x y z w_eq_x y_eq_z =
+  let wy_eq_xy = cong {f=(<+> y)} w_eq_x
+      xy_eq_xz = cong {f=(x <+>)} y_eq_z
+  in trans wy_eq_xy xy_eq_xz
+
 -- Inverse of some given element in a group is unique
 neg_unique : Group a =>
              (x : a) ->

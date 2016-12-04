@@ -26,15 +26,15 @@ data Isomorphism : (Group a, Group b) =>
           Isomorphism iso
 
 data Kernel : (Group a, Group b) =>
-              (hom : (a -> b) ** Homomorphism hom) ->
+              (a -> b) ->
               (x : a) ->
               Type where
   InKernel : (Group a, Group b) =>
              (x : a) ->
              (hom : (a -> b)) ->
-             (sigma_hom : (hom : (a -> b) ** Homomorphism hom)) ->
+             Homomorphism hom ->
              hom x = Groups.zero ->
-             Kernel sigma_hom x
+             Kernel hom x
 
 -- This proof is somewhat unsightly and goes over 80 chars per line =/
 -- I may fix it up later
@@ -55,7 +55,25 @@ zero_to_zero {a} {b} hom (IsHom _ prs) = sym step_5 where
   step_5 = cancel_right _ _ _ step_4
 
 zero_in_kernel : (Group a, Group b) =>
-                 (sigma_hom : (hom : (a -> b) ** Homomorphism hom)) ->
-                 Kernel sigma_hom Groups.zero
-zero_in_kernel sigma_hom =
-  InKernel _ _ _ (zero_to_zero (fst sigma_hom) (snd sigma_hom))
+                 (hom : (a -> b)) ->
+                 Homomorphism hom ->
+                 Kernel hom Groups.zero
+zero_in_kernel hom hom_prf = InKernel _ _ hom_prf (zero_to_zero hom hom_prf)
+
+-- Homomorphisms preserve inverses
+hom_negative : (Group a, Group b) =>
+               (hom : (a -> b)) ->
+               Homomorphism hom ->
+               (x : a) ->
+               hom (neg x) = neg (hom x)
+hom_negative hom (IsHom _ prs) x = neg_unique _ _ (left, right) where
+  left : hom x <+> hom (neg x) = Groups.zero
+  left = rewrite (sym (zero_to_zero hom (IsHom hom prs))) in
+         rewrite (sym (prs x (neg x))) in
+         rewrite (fst (inverse x)) in
+         Refl
+  right : hom (neg x) <+> hom x = Groups.zero
+  right = rewrite (sym (zero_to_zero hom (IsHom hom prs))) in
+          rewrite (sym (prs (neg x) x)) in
+          rewrite (snd (inverse x)) in
+          Refl
