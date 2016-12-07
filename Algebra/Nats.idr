@@ -25,6 +25,7 @@ lte_succ_void_eq (S k) (S j) lte lte_void with (fromLteSucc lte)
   | prf = cong $ lte_succ_void_eq k j prf (lte_void . LTESucc)
 
 -- This proof is admittedly rather unsightly. I may prettify it eventually.
+-- Note that the successor of a ends up being used to avoid zero
 division_algorithm : (a : Nat) ->
                      (b : Nat) ->
                      (q : Nat ** r : Nat ** (b = q * (S a) + r, LTE r a))
@@ -45,4 +46,51 @@ division_algorithm (S k) (S j) with (division_algorithm (S k) j)
                rewrite (plusSuccRightSucc (mult q (S (S k))) k) in
                rewrite s_k_eq_r in
                rewrite (sym s_s_k_eq_s_r) in
-               rewrite (sym eq_prf) in Refl
+               rewrite (sym eq_prf) in
+               Refl
+
+quotient : Nat -> Nat -> Nat
+quotient a b = fst $ division_algorithm a b
+
+remainder : Nat -> Nat -> Nat
+remainder a b = fst $ snd $ division_algorithm a b
+
+nat_to_fin : (n : Nat) ->
+             (m : Nat) ->
+             LT n m ->
+             Fin m
+nat_to_fin _ Z lt_proof = absurd lt_proof
+nat_to_fin Z (S j) lt_proof = FZ
+nat_to_fin (S k) (S j) lt_proof = let lt_proof' = fromLteSucc lt_proof
+                                   in shift (S Z) $ nat_to_fin k j lt_proof'
+
+-- Use the division algorithm to add two Fin n's
+fin_add : {n : Nat} ->
+          Fin n ->
+          Fin n ->
+          Fin n
+fin_add {n=Z} x y = FinZElim x
+fin_add {n=S k} x y =
+  let x' = finToNat x
+      y' = finToNat y
+      (_ ** r ** (_, lte_prf)) = division_algorithm k (x' + y')
+  in nat_to_fin r (S k) (LTESucc lte_prf)
+
+-- Will probably need to use a view later to satisfy the totality checker
+fin_neg : {n : Nat} ->
+          Fin n ->
+          Fin n
+fin_neg {n=Z} x = FinZElim x
+fin_neg {n=S k} FZ = FZ
+fin_neg {n=S (S k)} (FS FZ) = last
+fin_neg {n=S (S k)} (FS j) = assert_total $ pred $ fin_neg $ weaken j
+
+using (n : Nat)
+  implementation Group (Fin (S n)) where
+    (<+>) = fin_add
+    zero = FZ
+    neg = fin_neg
+    associativity x y z = ?assoc_hole
+    identity x = ?id_hole
+    inverse {n} x with (division_algorithm n (finToNat x + finToNat (fin_neg x)))
+      | (q ** r ** (eq_prf, lte_prf)) = ?inv_hole
