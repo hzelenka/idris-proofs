@@ -1,22 +1,9 @@
 module Nats
 
 import Algebra.Groups
-import Algebra.Cyclics
-import Data.Fin
 
 %default total
 %access public export
-
-data FinLTE : (x : Fin n) ->
-              (y : Fin n) ->
-              Type where
-  FinLTEZero : FinLTE FZ right
-  FinLTESucc : FinLTE left right -> FinLTE (FS left) (FS right)
-
-succ_lte_zero : LTE (S n) Z ->
-                Void
-succ_lte_zero LTEZero impossible
-succ_lte_zero (LTESucc _) impossible
 
 lte_succ_void_eq : (n : Nat) ->
                    (m : Nat) ->
@@ -113,41 +100,46 @@ lte_z_z : (x : Nat) ->
 lte_z_z Z lte_prf = Refl
 lte_z_z (S k) lte_prf = absurd lte_prf
 
--- Below two may be needed later
-apply_f_eq : f = g ->
-             x = y ->
-             f x = f y
-apply_f_eq eq_1 eq_2 = rewrite eq_1 in rewrite eq_2 in Refl
+cancel_mult : (x : Nat) ->
+              (y : Nat) ->
+              (z : Nat) ->
+              x * (S z) = y * (S z) ->
+              x = y
+cancel_mult x y Z eq_prf =
+  rewrite sym (multOneRightNeutral y) in
+  rewrite sym (multOneRightNeutral x) in
+  eq_prf
+cancel_mult Z y (S k) eq_prf with (product_zero _ _ (sym eq_prf))
+  | Left y_z      = sym y_z
+  | Right s_s_k_z = absurd $ SIsNotZ s_s_k_z
+cancel_mult (S j) Z (S k) eq_prf = absurd $ SIsNotZ eq_prf
+cancel_mult (S j) (S i) (S k) eq_prf =
+  cong $
+  cancel_mult _ _ _ $
+  plusLeftCancel _ _ _ $
+  succInjective _ _ $
+  succInjective _ _ $
+  eq_prf
 
-tuple_eq : w = x ->
-           y = z ->
-           (w, y) = (x, z)
-tuple_eq eq_1 eq_2 = rewrite eq_1 in rewrite eq_2 in Refl
-
--- Very much a work in progress. I got most of the cases to work w/ quotient,
--- remainder functions in last type of proof, but not the last =/
-partial
+-- Yo dawg I heard you liked with blocks
 division_alg_unique : (a : Nat) ->
                       (b : Nat) ->
                       (q : Nat) ->
                       (r : Nat) ->
                       (eq_prf : b = q * (S a) + r) ->
                       (lte_prf : LTE r a) ->
-                      (q ** r ** (eq_prf, lte_prf)) = division_algorithm a b
+                      (q = quotient a b, r = remainder a b)
 division_alg_unique a Z q r eq_prf lte_prf with (division_algorithm a Z)
   | (q' ** r' ** (eq_prf', lte_prf')) =
-    let (mult_q_prf, r_prf) = sum_zero (q * (S a)) r (sym eq_prf)
-        (mult_q_prf', r_prf') = sum_zero (q' * (S a)) r' (sym eq_prf') in
-    case (product_zero q (S a) mult_q_prf, product_zero q' (S a) mult_q_prf') of
-        (Left prf_1, Left prf_2) =>
-          ?exact
-        (_, Right prf_2) => absurd $ SIsNotZ prf_2
-        (Right prf_1, _) => absurd $ SIsNotZ prf_1
+    let (mult_q_prf, r_zero) = sum_zero (q * (S a)) r (sym eq_prf) in
+    case product_zero _ _ mult_q_prf of
+         Left q_zero => (q_zero, r_zero)
+         Right q_succ => absurd $ SIsNotZ q_succ
 division_alg_unique Z b q r eq_prf lte_prf with (division_algorithm Z b)
   | (q' ** r' ** (eq_prf', lte_prf'))
     with (lte_z_z r lte_prf, lte_z_z r' lte_prf')
-    | (r_z, r_z') = ?div_hole --(trans left_eq right_eq, trans r_z (sym r_z')) where
-      {- s_z : S r = 1
+    | (r_z, r_z') = (trans left_eq right_eq, trans r_z (sym r_z')) where
+      s_z : S r = 1
       s_z = cong r_z
       s_z' : S r' = 1
       s_z' = cong r_z'
@@ -163,54 +155,47 @@ division_alg_unique Z b q r eq_prf lte_prf with (division_algorithm Z b)
                  rewrite sym r_z' in
                  rewrite s_z' in
                  eq_prf'
-                 division_algorithm_unique (S j) (S k) q r eq_prf lte_prf = ?unique_hole_3 -}
+-- These two cases will be merged later
+division_alg_unique k (S j) q Z eq_prf lte_prf
+  with (division_algorithm k (S j))
+  | (q' ** r' ** (eq_prf', lte_prf'))
+    with (division_alg_unique k j q k (believe_me k) (believe_me k))
+    | (q_unique, r_unique) with (division_algorithm k j)
+      | (q'' ** r'' ** (eq_prf'', lte_prf'')) with (decEq q q', decEq 0 r')
+        | (Yes q_prf, Yes r_prf)     = (q_prf, r_prf)
+        | (Yes q_prf, No r_contra)   =
+          absurd $
+          r_contra $
+          plusLeftCancel (q' * S k) Z r' $
+          replace {P=(\val => val * S k + Z = q' * S k + r')} q_prf $
+          trans (sym eq_prf) eq_prf'
+        | (No q_contra, Yes r_prf)   =
+          absurd $
+          q_contra $
+          cancel_mult q q' k $
+          plusRightCancel (q * S k) (q' * S k) Z $
+          replace {P=(\val => q * S k + Z = q' * S k + val)} (sym r_prf) $
+          trans (sym eq_prf) eq_prf'
+        | (No q_contra, No r_contra) = ?r_zero_hole_4
+division_alg_unique k (S j) q (S r) eq_prf lte_prf
+  with (division_algorithm k (S j))
+  | (q' ** r' ** (eq_prf', lte_prf'))
+    with (division_alg_unique k j q r (believe_me k) (believe_me k))
+    | (q_unique, r_unique) with (division_algorithm k j)
+      | (q'' ** r'' ** (eq_prf'', lte_prf'')) with (decEq q q', decEq (S r) r')
+        | (Yes q_prf, Yes r_prf)     = (q_prf, r_prf)
+        | (Yes q_prf, No r_contra)   =
+          absurd $
+          r_contra $
+          plusLeftCancel (q' * S k) (S r) r' $
+          replace {P=(\val => val * S k + S r = q' * S k + r')} q_prf $
+          trans (sym eq_prf) eq_prf'
+        | (No q_contra, Yes r_prf)   =
+          absurd $
+          q_contra $
+          cancel_mult q q' k $
+          plusRightCancel (q * S k) (q' * S k) (S r) $
+          replace {P=(\val => q * S k + S r = q' * S k + val)} (sym r_prf) $
+          trans (sym eq_prf) eq_prf'
+        | (No q_contra, No r_contra) = ?dec_eq_hole_4
 
-nat_to_fin : (n : Nat) ->
-             (m : Nat) ->
-             LT n m ->
-             Fin m
-nat_to_fin _ Z lt_proof = absurd lt_proof
-nat_to_fin Z (S j) lt_proof = FZ
-nat_to_fin (S k) (S j) lt_proof = let lt_proof' = fromLteSucc lt_proof
-                                   in shift (S Z) $ nat_to_fin k j lt_proof'
-
--- Use the division algorithm to add two Fin n's
-fin_add : {n : Nat} ->
-          Fin n ->
-          Fin n ->
-          Fin n
-fin_add {n=Z} x y = FinZElim x
-fin_add {n=S k} x y =
-  let x' = finToNat x
-      y' = finToNat y
-      (_ ** r ** (_, lte_prf)) = division_algorithm k (x' + y')
-  in nat_to_fin r (S k) (LTESucc lte_prf)
-
--- Will probably need to use a view later to satisfy the totality checker
-fin_neg : {n : Nat} ->
-          Fin n ->
-          Fin n
-fin_neg {n=Z} x = FinZElim x
-fin_neg {n=S k} FZ = FZ
-fin_neg {n=S (S k)} (FS FZ) = last
-fin_neg {n=S (S k)} (FS j) = assert_total $ pred $ fin_neg $ weaken j
-
-fin_assoc : (x : Fin (S n)) ->
-            (y : Fin (S n)) ->
-            (z : Fin (S n)) ->
-            fin_add (fin_add x y) z = fin_add x (fin_add y z)
-
-fin_id : (x : Fin (S n)) ->
-         (fin_add x FZ = x, fin_add FZ x = x)
-fin_id x with (fin_add x FZ, fin_add FZ x)
-  | (left_prf, right_prf) = (?l_hole, ?r_hole)
-
-using (n : Nat)
-  implementation Group (Fin (S n)) where
-    (<+>) = fin_add
-    zero = FZ
-    neg = fin_neg
-    associativity x y z = fin_assoc x y z
-    identity x = fin_id x
-    inverse {n} x with (division_algorithm n (finToNat x + finToNat (fin_neg x)))
-      | (q ** r ** (eq_prf, lte_prf)) = ?inv_hole
