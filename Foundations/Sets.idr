@@ -72,8 +72,16 @@ p /\ q = MkSet (\x => (prop p x, prop q x)) dec_prf where
     | (Yes p_prf, No q_contra)   = No (\(_,q) => q_contra q)
     | (No p_contra, Yes q_prf)   = No (\(p, _) => p_contra p)
     | (No p_contra, No q_contra) = No (\(p, _) => p_contra p)
-  
--- TO DO: Set difference
+
+-- Set difference
+infixl 4 ~\
+(~\) : Set a -> Set a -> Set a
+p ~\ q = MkSet (\x => (prop p x, Not (prop q x))) dec_prf where
+  dec_prf el with (dec p el, dec q el)
+    | (Yes p_prf, Yes q_prf) = No (\(_,q_contra) => q_contra q_prf)
+    | (Yes p_prf, No q_contra) = Yes (p_prf, q_contra)
+    | (No p_contra, Yes q_prf) = No (\(p_prf,_) => p_contra p_prf)
+    | (No p_contra, No q_contra) = No (\(p_prf,_) => p_contra p_prf)
 
 -- TO DO: Symmetric difference
 
