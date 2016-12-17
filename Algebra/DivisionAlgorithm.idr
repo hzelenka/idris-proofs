@@ -5,17 +5,17 @@ import Algebra.Groups
 %default total
 %access public export
 
-lte_succ_void_eq : (n : Nat) ->
-                   (m : Nat) ->
-                   (LTE n (S m)) ->
-                   (LTE n m -> Void) ->
-                   n = S m
-lte_succ_void_eq Z m lte lte_void = absurd $ lte_void LTEZero
-lte_succ_void_eq (S Z) Z lte lte_void = Refl
-lte_succ_void_eq (S (S n)) Z lte lte_void =
-  absurd $ succNotLTEzero $ fromLteSucc lte
-lte_succ_void_eq (S k) (S j) lte lte_void with (fromLteSucc lte)
-  | prf = cong $ lte_succ_void_eq k j prf (lte_void . LTESucc)
+lte_successor : (m : Nat) ->
+                (n : Nat) ->
+                (LTE m n -> Void) ->
+                LTE m (S n) ->
+                m = S n
+lte_successor Z n lte_contra lte_prf = absurd $ lte_contra LTEZero
+lte_successor (S Z) Z lte_contra lte_prf = Refl
+lte_successor (S k) (S j) lte_contra lte_prf =
+  let rec = lte_successor k j (\x => lte_contra (LTESucc x))
+                              (fromLteSucc lte_prf)
+  in cong rec
 
 division_algorithm : (a : Nat) -> -- S a will be used to avoid division by zero
                      (b : Nat) ->
@@ -62,7 +62,7 @@ division_algorithm (S k) (S j) with (division_algorithm (S k) j)
     -- condition, it is clearly satisfied because our remainder of zero is LTE
     -- to everything.
     | No contra = (S q ** Z ** (s_j_eq, LTEZero)) where
-      s_j_eq = let s_k_eq_r = sym (lte_succ_void_eq r k lte_prf contra)
+      s_j_eq = let s_k_eq_r = sym (lte_successor r k contra lte_prf)
                    s_s_k_eq_s_r = cong {f=S} s_k_eq_r in
                rewrite (plusZeroRightNeutral (plus k (mult q (S (S k))))) in
                rewrite (plusCommutative k (mult q (S (S k)))) in
@@ -100,28 +100,18 @@ lte_z_z : (x : Nat) ->
 lte_z_z Z lte_prf = Refl
 lte_z_z (S k) lte_prf = absurd lte_prf
 
-cancel_mult : (x : Nat) ->
-              (y : Nat) ->
-              (z : Nat) ->
-              x * (S z) = y * (S z) ->
-              x = y
-cancel_mult x y Z eq_prf =
-  rewrite sym (multOneRightNeutral y) in
-  rewrite sym (multOneRightNeutral x) in
-  eq_prf
-cancel_mult Z y (S k) eq_prf with (product_zero _ _ (sym eq_prf))
-  | Left y_z      = sym y_z
-  | Right s_s_k_z = absurd $ SIsNotZ s_s_k_z
-cancel_mult (S j) Z (S k) eq_prf = absurd $ SIsNotZ eq_prf
-cancel_mult (S j) (S i) (S k) eq_prf =
-  cong $
-  cancel_mult _ _ _ $
-  plusLeftCancel _ _ _ $
-  succInjective _ _ $
-  succInjective _ _ $
-  eq_prf
+not_succ_lte : (m : Nat) ->
+               LTE (S m) m ->
+               Void
+not_succ_lte Z prf = absurd prf
+not_succ_lte (S k) prf = not_succ_lte k $ fromLteSucc prf
 
--- Yo dawg I heard you liked with blocks
+not_succ_eq : (m : Nat) ->
+              m = S m ->
+              Void
+not_succ_eq Z eq = absurd $ SIsNotZ $ sym eq
+not_succ_eq (S k) eq = not_succ_eq k $ succInjective _ _ eq
+
 division_alg_unique : (a : Nat) ->
                       (b : Nat) ->
                       (q : Nat) ->
@@ -155,47 +145,30 @@ division_alg_unique Z b q r eq_prf lte_prf with (division_algorithm Z b)
                  rewrite sym r_z' in
                  rewrite s_z' in
                  eq_prf'
--- These two cases will be merged later
-division_alg_unique k (S j) q Z eq_prf lte_prf
-  with (division_algorithm k (S j))
-  | (q' ** r' ** (eq_prf', lte_prf'))
-    with (division_alg_unique k j q k (believe_me k) (believe_me k))
-    | (q_unique, r_unique) with (division_algorithm k j)
-      | (q'' ** r'' ** (eq_prf'', lte_prf'')) with (decEq q q', decEq 0 r')
-        | (Yes q_prf, Yes r_prf)     = (q_prf, r_prf)
-        | (Yes q_prf, No r_contra)   =
-          absurd $
-          r_contra $
-          plusLeftCancel (q' * S k) Z r' $
-          replace {P=(\val => val * S k + Z = q' * S k + r')} q_prf $
-          trans (sym eq_prf) eq_prf'
-        | (No q_contra, Yes r_prf)   =
-          absurd $
-          q_contra $
-          cancel_mult q q' k $
-          plusRightCancel (q * S k) (q' * S k) Z $
-          replace {P=(\val => q * S k + Z = q' * S k + val)} (sym r_prf) $
-          trans (sym eq_prf) eq_prf'
-        | (No q_contra, No r_contra) = ?r_zero_hole_4
-division_alg_unique k (S j) q (S r) eq_prf lte_prf
-  with (division_algorithm k (S j))
-  | (q' ** r' ** (eq_prf', lte_prf'))
-    with (division_alg_unique k j q r (believe_me k) (believe_me k))
-    | (q_unique, r_unique) with (division_algorithm k j)
-      | (q'' ** r'' ** (eq_prf'', lte_prf'')) with (decEq q q', decEq (S r) r')
-        | (Yes q_prf, Yes r_prf)     = (q_prf, r_prf)
-        | (Yes q_prf, No r_contra)   =
-          absurd $
-          r_contra $
-          plusLeftCancel (q' * S k) (S r) r' $
-          replace {P=(\val => val * S k + S r = q' * S k + r')} q_prf $
-          trans (sym eq_prf) eq_prf'
-        | (No q_contra, Yes r_prf)   =
-          absurd $
-          q_contra $
-          cancel_mult q q' k $
-          plusRightCancel (q * S k) (q' * S k) (S r) $
-          replace {P=(\val => q * S k + S r = q' * S k + val)} (sym r_prf) $
-          trans (sym eq_prf) eq_prf'
-        | (No q_contra, No r_contra) = ?dec_eq_hole_4
-
+division_alg_unique (S k) (S j) Z Z eq_prf lte_prf = absurd $ SIsNotZ eq_prf
+division_alg_unique (S k) (S j) (S q) Z eq_prf lte_prf = exact where
+  eq_rec : j = q * (S (S k)) + S k
+  eq_rec = rewrite sym (plusSuccRightSucc (q * (S (S k))) k) in
+           rewrite plusCommutative (q * (S (S k))) k in
+           rewrite sym (plusZeroRightNeutral (k + q * (S (S k)))) in
+           succInjective _ _ eq_prf
+  exact with (division_alg_unique (S k) j q (S k) eq_rec (lteRefl))
+    | (q_eq, r_eq) with (division_algorithm (S k) j)
+      | (q' ** r' ** (eq_prf', lte_prf')) with (isLTE r' k)
+        | Yes prf = absurd $ not_succ_lte k $ rewrite r_eq in prf
+        | No contra = (cong q_eq, Refl)
+division_alg_unique (S k) (S j) q (S r) eq_prf lte_prf
+  with (division_alg_unique (S k) j q r
+          (succInjective _ _ (trans eq_prf (sym (plusSuccRightSucc
+            (q*(S (S k))) r))))
+          (lteSuccLeft lte_prf))
+    | (q_eq, r_eq) with (division_algorithm (S k) j)
+      | (q' ** r' ** (eq_prf', lte_prf')) with (isLTE r' k)
+        | Yes prf = (q_eq, cong r_eq)
+        | No contra = absurd (not_succ_lte (S k) lte_k) where
+          r_s_k' : r' = S k
+          r_s_k' = lte_successor r' k contra lte_prf'
+          r_s_k : r = S k
+          r_s_k = trans r_eq r_s_k'
+          lte_k : LTE (S (S k)) (S k)
+          lte_k = replace {P=\val => LTE (S val) (S k)} r_s_k lte_prf
