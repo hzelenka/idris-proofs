@@ -2,23 +2,8 @@ module AdditiveGroups
 
 import Algebra.Groups
 import Algebra.Cyclics
-import Algebra.DivisionAlgorithm
+import NumberTheory.DivisionAlgorithm
 import Data.Fin
-
-nat_to_fin : (n : Nat) ->
-             (m : Nat) ->
-             LTE n m ->
-             Fin (S m)
-nat_to_fin _ Z _ = FZ
-nat_to_fin Z _ _ = FZ
-nat_to_fin (S j) (S k) lte_prf =
-  let rec = nat_to_fin j k (fromLteSucc lte_prf)
-  in shift (S Z) rec
-
--- Conversion always sends Z to FZ
-nat_to_fin_z_fz : nat_to_fin Z m lte_prf = FZ
-nat_to_fin_z_fz {m = Z} {lte_prf = lte_prf} = Refl
-nat_to_fin_z_fz {m = (S k)} {lte_prf = lte_prf} = Refl
 
 -- Use the division algorithm to add two Fin n's
 fin_add : {n : Nat} ->

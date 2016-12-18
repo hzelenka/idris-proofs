@@ -1,6 +1,4 @@
-module Nats
-
-import Algebra.Groups
+module DivisionAlgorithm
 
 %default total
 %access public export

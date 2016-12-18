@@ -1,6 +1,6 @@
 module Rings
 
-import Groups
+import Algebra.Groups
 
 %default total
 %access public export
