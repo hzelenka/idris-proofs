@@ -1,6 +1,7 @@
 module FreeGroups
 
 import Data.Vect
+import Data.Vect.Views
 %hide Data.Vect.take
 
 %default total
@@ -22,9 +23,41 @@ take (S k) (S j) (x :: xs) lte = x :: rec where
 
 -- Take zero is always the empty vector
 take_z_nil : (xs : Vect m a) ->
-             take Z m xs LTEZero = Nil
+             take Z m xs _ = Nil
 take_z_nil {m = Z} [] = Refl
 take_z_nil {m = (S k)} (x :: xs) = Refl
+
+take_id : (xs : Vect n a) ->
+          take n n xs _ = xs
+take_id {n = Z} [] = Refl
+take_id {n = (S k)} (x :: xs) = let rec = take_id xs in cong rec
+
+take_idempotent : (n : Nat) ->
+                  (m : Nat) ->
+                  (xs : Vect m a) ->
+                  (lte_prf : LTE n m) ->
+                  take n m xs lte_prf = take n n (take n m xs lte_prf) _
+take_idempotent Z _ xs _ =
+  trans (take_z_nil xs) (sym (take_z_nil (take Z _ xs _)))
+take_idempotent (S k) Z xs lte_prf = absurd lte_prf
+take_idempotent (S k) (S j) xs lte_prf =
+  sym $ take_id {n=S k} $ take (S k) (S j) xs lte_prf
+
+take_take : (n : Nat) ->
+            (m : Nat) ->
+            (k : Nat) ->
+            (xs : Vect k a) ->
+            (lte1 : LTE n m) ->
+            (lte2 : LTE m k) ->
+            take n k xs (lteTransitive lte1 lte2) =
+            take n m (take m k xs lte2) lte1
+take_take Z _ _ xs LTEZero _ =
+  trans (take_z_nil xs) (sym (take_z_nil (take _ _ xs _)))
+take_take _ (S k) Z xs lte1 lte2 = absurd lte2
+take_take (S k) _ Z xs lte1 lte2 = absurd $ lteTransitive lte1 lte2
+take_take (S j) (S m) (S k) xs lte1 lte2 with (decEq j m)
+  | Yes prf = ?take_take_yes
+  | No contra = ?take_take_no
 
 -- Predicate that a vector is contained (in order!) in another vector
 data Subvect : Vect k a ->
@@ -104,21 +137,36 @@ check_subvect {k = (S len)} {j = (S k)} (x :: xs) (y :: ys)
       subv_contra (SubvHere _ _ {lte_prf} prf) = contra (lte_prf ** prf)
       subv_contra (SubvThere _ _ later) = contra' later
 
-||| Vector with a guarantee that certain sequences do not appear
+-- xs is a subvect of ys and ys is a subvect of zs => xs is a subvect of zs
+subvect_trans : DecEq a =>
+                (xs : Vect k a) ->
+                (ys : Vect j a) ->
+                (zs : Vect i a) ->
+                Subvect xs ys ->
+                Subvect ys zs ->
+                Subvect xs zs
+
+infixl 6 <>
+interface Invertible a where
+  (<>) : a -> a -> a
+  inv : a -> a
+  dec_inv : (x : a) ->
+            (x' : a) ->
+            Dec (x' = inv x)
+
+||| Vector with a guarantee that an element does not occur next to its inverse
 data Word : (a : Type) ->
-            (axioms : ((n : Nat) ->
-                       Vect (S n) a ->
-                       Maybe a)) ->
             Type where
   ||| Empty word
-  Empty : Word a axioms
+  Empty : Invertible a =>
+          Word a
   ||| Nonempty word w/o the sequences
-  MkWord : (ys : Vect (S m) a) ->
-           (axioms : ((n : Nat) ->
-                      Vect (S n) a ->
-                      Maybe a)) ->
-           ((xs : Vect (S k) a) ->
-            axioms k xs = Just _ ->
-            Subvect xs ys ->
+  MkWord : Invertible a =>
+           (ys : Vect (S k) a) ->
+           ((x : a) ->
+            Either (Subvect [x, inv x] ys) (Subvect [inv x, x] ys) ->
             Void) ->
-            Word a axioms
+           Word a
+
+wconcat : Invertible a => Word a -> Word a -> Word a
+

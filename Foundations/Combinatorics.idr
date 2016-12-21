@@ -47,5 +47,3 @@ permutation_fac a Z (Equi a Z bij) =
 permutation_fac a (S k) equi_a =
   let rec = (\b, equi_b => permutation_fac b k equi_b)
   in ?perm_hole_3
-
---data Combination : Type -> Nat -> Type where

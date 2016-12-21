@@ -34,6 +34,14 @@ data (~=) : Type -> Nat -> Type where
          (bij : (f : (a -> Fin n) ** Bijective f)) ->
          (~=) a n
 
+card_uniq : (a : Type) ->
+            (n : Nat) ->
+            (m : Nat) ->
+            a ~= n ->
+            a ~= m ->
+            n = m
+card_uniq a n m (Equi _ _ (f ** f_bij)) (Equi _ _ (g ** g_bij)) = ?card_hole
+
 data LeftInv : (domain -> codomain) -> (codomain -> domain) -> Type where
   LInv : (f : domain -> codomain) ->
          (g : codomain -> domain) ->
