@@ -40,10 +40,3 @@ permutation_fac : (a : Type) ->
                   (n : Nat) ->
                   a ~= n ->
                   Permute a n ~= fac n
-permutation_fac a Z (Equi a Z bij) =
-  Equi (Permute a 0) 1 (\x => FZ ** Bij _ inj srj) where
-  inj = Inj _ (\x, y, _ => case x of Nil => case y of Nil => Refl)
-  srj = Srj _ (\z => case z of FZ => (Nil ** Refl))
-permutation_fac a (S k) equi_a =
-  let rec = (\b, equi_b => permutation_fac b k equi_b)
-  in ?perm_hole_3
