@@ -2,6 +2,7 @@ module AdditiveGroups
 
 import Algebra.Groups
 import Algebra.Cyclics
+import Foundations.Cardinality
 import NumberTheory.DivisionAlgorithm
 import Data.Fin
 
