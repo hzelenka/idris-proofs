@@ -1,6 +1,7 @@
 module Cyclics
 
 import Data.Fin
+import Foundations.Cardinality
 import Foundations.Sets
 import Foundations.Functions
 import Algebra.Groups
@@ -9,16 +10,6 @@ import NumberTheory.DivisionAlgorithm
 
 %default total
 %access public export
-
-nat_to_fin : (n : Nat) ->
-             (m : Nat) ->
-             LTE n m ->
-             Fin (S m)
-nat_to_fin _ Z _ = FZ
-nat_to_fin Z _ _ = FZ
-nat_to_fin (S j) (S k) lte_prf =
-  let rec = nat_to_fin j k (fromLteSucc lte_prf)
-  in shift (S Z) rec
 
 -- Conversion always sends Z to FZ
 nat_to_fin_z_fz : nat_to_fin Z m lte_prf = FZ
@@ -76,8 +67,7 @@ divides_quo_rem m n (Divides _ _ k div) = exact where
 trivial_group : CyclicGroup a =>
                 (Cyclics.gen = Groups.zero {a}) ->
                 a ~= 1
-trivial_group {a} eqg = Equi a 1 ((\_ => FZ) **
-                        Bij _ (Inj _ inj) (Srj _ srj)) where
+trivial_group {a} eqg = Finite _ _ ((\_ => FZ) ** Bij _ inj srj) where
   inj x y _ with (is_cyclic x, is_cyclic y)
     | ((x_ord ** x_eq), (y_ord ** y_eq)) = trans (sym x_zero) y_zero where
       x_zero : Groups.zero = x

@@ -1,172 +1,109 @@
 module FreeGroups
 
 import Data.Vect
-import Data.Vect.Views
-%hide Data.Vect.take
+import Algebra.Groups
 
 %default total
 %access public export
 
--- Data.Vect.take forces the vector to be of the form n + m
--- My version instead takes a witness to LTE n m
-take : (n : Nat) ->
-       (m : Nat) ->
-       Vect m a ->
-       LTE n m ->
-       Vect n a
-take Z Z [] lte = []
-take (S k) Z [] lte = absurd lte
-take Z (S j) (x :: xs) lte = []
-take (S k) (S j) (x :: xs) lte = x :: rec where
-  rec : Vect k a
-  rec = take k j xs $ fromLteSucc lte
-
--- Take zero is always the empty vector
-take_z_nil : (xs : Vect m a) ->
-             take Z m xs _ = Nil
-take_z_nil {m = Z} [] = Refl
-take_z_nil {m = (S k)} (x :: xs) = Refl
-
-take_id : (xs : Vect n a) ->
-          take n n xs _ = xs
-take_id {n = Z} [] = Refl
-take_id {n = (S k)} (x :: xs) = let rec = take_id xs in cong rec
-
-take_idempotent : (n : Nat) ->
-                  (m : Nat) ->
-                  (xs : Vect m a) ->
-                  (lte_prf : LTE n m) ->
-                  take n m xs lte_prf = take n n (take n m xs lte_prf) _
-take_idempotent Z _ xs _ =
-  trans (take_z_nil xs) (sym (take_z_nil (take Z _ xs _)))
-take_idempotent (S k) Z xs lte_prf = absurd lte_prf
-take_idempotent (S k) (S j) xs lte_prf =
-  sym $ take_id {n=S k} $ take (S k) (S j) xs lte_prf
-
-take_take : (n : Nat) ->
-            (m : Nat) ->
-            (k : Nat) ->
-            (xs : Vect k a) ->
-            (lte1 : LTE n m) ->
-            (lte2 : LTE m k) ->
-            take n k xs (lteTransitive lte1 lte2) =
-            take n m (take m k xs lte2) lte1
-take_take Z _ _ xs LTEZero _ =
-  trans (take_z_nil xs) (sym (take_z_nil (take _ _ xs _)))
-take_take _ (S k) Z xs lte1 lte2 = absurd lte2
-take_take (S k) _ Z xs lte1 lte2 = absurd $ lteTransitive lte1 lte2
-take_take (S j) (S m) (S k) xs lte1 lte2 with (decEq j m)
-  | Yes prf = ?take_take_yes
-  | No contra = ?take_take_no
-
--- Predicate that a vector is contained (in order!) in another vector
-data Subvect : Vect k a ->
-               Vect j a ->
-               Type where
-  SubvHere : (xs : Vect k a) ->
-             (ys : Vect j a) ->
-             {auto lte_prf : LTE k j} ->
-             xs = take k j ys lte_prf ->
-             Subvect xs ys
-  SubvThere : (xs : Vect k a) ->
-              (ys : Vect j a) ->
-              (later : Subvect xs ys) ->
-              Subvect xs (y :: ys)
-
--- The empty vector is always a subvector
-trivial_subv : (xs : Vect m a) ->
-               Subvect [] xs
-trivial_subv xs = SubvHere [] xs $ sym $ take_z_nil xs
-
--- No nontrivial vector is a subvector of the empty vector
-implementation Uninhabited (Subvect (x :: xs) []) where
-  uninhabited (SubvHere {lte_prf} {k=S len} {j=Z} _ _ _) = absurd lte_prf
-
--- If the heads and tails are equal, the resulting vector is equal
-parallel_cons : (x, y : a) ->
-                (xs, ys : Vect k a) ->
-                x = y ->
-                xs = ys ->
-                x :: xs = y :: ys
-parallel_cons x y xs ys eq_1 eq_2 =
-  replace {P=(\val => x :: xs = val :: ys)} eq_1 $
-  cong {f=(\zs => x :: zs)} eq_2
-
--- If the vectors are equal, the heads are equal
-heads_eq : (xs : Vect k a) ->
-           (ys : Vect k a) ->
-           x :: xs = y :: ys ->
-           x = y
-heads_eq xs ys eq = cong {f=head} eq
-
--- If the vectors are equal, the tails are equal
-tails_eq : (xs : Vect k a) ->
-           (ys : Vect k a) ->
-           x :: xs = y :: ys ->
-           xs = ys
-tails_eq xs ys eq = cong {f=tail} eq
-
--- Determine if the first vector is a prefix of the second
-check_prefix : DecEq a =>
-               (xs : Vect k a) ->
-               (ys : Vect j a) ->
-               Dec (lte_prf : LTE k j ** xs = take k j ys lte_prf)
-check_prefix [] ys = Yes (LTEZero ** sym (take_z_nil ys))
-check_prefix (x :: xs) [] = No (\(lte_prf ** _) => absurd lte_prf)
-check_prefix (x :: xs) (y :: ys) with (decEq x y)
-  | Yes prf with (check_prefix xs ys)
-    | Yes (lte_prf ** eq_prf) = Yes (LTESucc lte_prf ** eq_prf') where
-      eq_prf' = parallel_cons _ _ _ _ prf eq_prf
-    | No contra' = No (\(lte_prf ** eq_prf) =>
-                        contra' (fromLteSucc lte_prf ** tails_eq _ _ eq_prf))
-  | No contra = No (\(_ ** eq_prf) => contra (heads_eq _ _ eq_prf))
-
--- Determine if the first vector is anywhere in the second vector
-check_subvect : DecEq a =>
-                (xs : Vect k a) ->
-                (ys : Vect j a) ->
-                Dec (Subvect xs ys)
-check_subvect {k = Z} {j = j} [] ys = Yes $ trivial_subv ys
-check_subvect {k = (S len)} {j = Z} (x :: xs) [] = No (\prf => absurd prf)
-check_subvect {k = (S len)} {j = (S k)} (x :: xs) (y :: ys)
-  with (check_prefix (x :: xs) (y :: ys))
-  | Yes (lte_prf ** eq_prf) = Yes $ SubvHere _ _ eq_prf
-  | No contra with (check_subvect (x :: xs) ys)
-    | Yes prf = Yes $ SubvThere _ _ prf
-    | No contra' = No subv_contra where
-      subv_contra (SubvHere _ _ {lte_prf} prf) = contra (lte_prf ** prf)
-      subv_contra (SubvThere _ _ later) = contra' later
-
--- xs is a subvect of ys and ys is a subvect of zs => xs is a subvect of zs
-subvect_trans : DecEq a =>
-                (xs : Vect k a) ->
-                (ys : Vect j a) ->
-                (zs : Vect i a) ->
-                Subvect xs ys ->
-                Subvect ys zs ->
-                Subvect xs zs
-
 infixl 6 <>
-interface Invertible a where
+interface DecEq a => Invertible a where
   (<>) : a -> a -> a
   inv : a -> a
-  dec_inv : (x : a) ->
-            (x' : a) ->
-            Dec (x' = inv x)
+  inv_inv : (x : a) ->
+            x = inv (inv x)
 
-||| Vector with a guarantee that an element does not occur next to its inverse
-data Word : (a : Type) ->
-            Type where
-  ||| Empty word
-  Empty : Invertible a =>
+dec_inv : Invertible a =>
+          (x : a) ->
+          (x' : a) ->
+          Dec (x' = inv x)
+dec_inv x x' = decEq x' (inv x)
+
+mutual
+  data Word : (a : Type) ->
+              Type where
+    WNil : Invertible a =>
           Word a
-  ||| Nonempty word w/o the sequences
-  MkWord : Invertible a =>
-           (ys : Vect (S k) a) ->
-           ((x : a) ->
-            Either (Subvect [x, inv x] ys) (Subvect [inv x, x] ys) ->
-            Void) ->
+    WCons : Invertible a =>
+           (w : a) ->
+           (ws : Word a) ->
+           (prf : Either (head ws = Nothing) (Not (head ws = Just (inv w)))) ->
            Word a
 
-wconcat : Invertible a => Word a -> Word a -> Word a
+  head : Word a -> Maybe a
+  head WNil = Nothing
+  head (WCons w _ _) = Just w
 
+implementation Foldable Word where
+  foldr f acc WNil = acc
+  foldr f acc (WCons w ws _) = f w $ foldr f acc ws
+  foldl f acc WNil = acc
+  foldl f acc (WCons w ws _) = foldl f (f acc w) ws
+
+tail : Word a -> Word a
+tail WNil = WNil
+tail (WCons _ ws _) = ws
+
+length : Word a -> Nat
+length WNil = Z
+length (WCons _ ws _) = S $ length ws
+
+cons_helper : Invertible a =>
+              (w : a) ->
+              (ws : Word a) ->
+              Maybe (Either (head ws = Nothing) (Not (head ws = Just (inv w))))
+cons_helper w WNil = Just $ Left Refl
+cons_helper {a} w (WCons x ws w_prf) with (dec_inv w x)
+  | Yes prf = Nothing
+  | No contra = Just $ Right (\eq => contra (justInjective eq))
+
+-- Infix word construction; adjacent inverses are removed
+wappend : Invertible a => a -> Word a -> Word a
+wappend w WNil = WCons w WNil (Left Refl)
+wappend w ws with (cons_helper w ws)
+  | Nothing = tail ws
+  | Just prf = WCons w ws prf
+
+rewrite_wappend : Invertible a =>
+                  (ws : Word a) ->
+                  ws = foldr FreeGroups.wappend WNil ws
+rewrite_wappend {a} WNil = Refl
+rewrite_wappend {a} (WCons w ws prf) = let rec = rewrite_wappend ws in
+  trans eq (cong {f=wappend w} rec) where
+    eq = case prf of (Left l) => ?eq_hole_1
+                     (Right r) => ?eq_hole_2
+
+-- Like wappend, adjacent inverses are removed
+wconcat : Invertible a => Word a -> Word a -> Word a
+wconcat WNil ms = ms
+wconcat ws WNil = ws
+wconcat (WCons w WNil prf) ms = w `wappend` ms
+wconcat (WCons w ws prf) ms = w `wappend` (ws `wconcat` ms)
+
+wconcat_id : Invertible a =>
+             (ws : Word a) ->
+             (ws `wconcat` WNil = ws,
+              WNil `wconcat` ws = ws)
+wconcat_id ws = (left_prf ws, Refl) where
+  left_prf WNil = Refl
+  left_prf (WCons _ _ _) = Refl
+
+-- Invert a word
+winv : Invertible a => Word a -> Word a
+winv WNil = WNil
+winv (WCons w WNil _) = WCons (inv w) WNil (Left Refl)
+winv (WCons w ws prf) = (winv ws) `wconcat` (WCons (inv w) WNil (Left Refl))
+
+winv_wnil_wnil : Invertible a =>
+                 winv (WNil {a}) = WNil
+winv_wnil_wnil = Refl
+
+winv_is_inv : Invertible a =>
+              (ws : Word a) ->
+              (ws `wconcat` (winv ws) = WNil,
+               (winv ws) `wconcat` ws = WNil)
+winv_is_inv {a} WNil = (Refl, Refl)
+winv_is_inv {a} (WCons w ws prf) = (left_prf, right_prf) where
+  left_prf = let rec = fst (winv_is_inv ws)
+             in ?left_hole
+  right_prf = ?right_hole
