@@ -24,34 +24,17 @@ data (~=) : Type -> Nat -> Type where
 Aleph : Type -> Type
 Aleph a = (f : (a -> Nat) ** Bijective f)
 
-||| Maybe applied to a finite set has cardinality one greater
-s_fin_maybe_fin : (n : Nat) ->
-                  Maybe (Fin n) ~= S n
-s_fin_maybe_fin Z = Finite _ _ (f ** Bij _ f_inj f_srj) where
-  f : Maybe (Fin 0) -> Fin 1
-  f Nothing = FZ
-  f_inj Nothing Nothing _ = Refl
-  f_srj FZ = (Nothing ** Refl)
-s_fin_maybe_fin (S k) = Finite _ _ (f ** Bij _ f_inj f_srj) where
-  f : Maybe (Fin n) -> Fin (S n)
-  f Nothing = FZ
-  f (Just n) = FS n
-  f_inj Nothing Nothing eq = Refl
-  f_inj Nothing (Just x) eq = absurd $ FZNotFS eq
-  f_inj (Just x) Nothing eq = absurd $ FZNotFS $ sym eq
-  f_inj (Just x) (Just y) eq = cong $ FSInjective _ _ eq
-  f_srj FZ = (Nothing ** Refl)
-  f_srj (FS x) = (Just x ** Refl)
+-- The proofs up to bij_fin_one probably won't end up being necessary
+-- I'm keeping them around just in case
 
--- Very much a work in progress from here on out
--- Many functions are mostly holes!
-
+||| Predicate expressing that a Fin is the largest element in its type
 data IsLast : Fin (S n) ->
               Type where
   ItIsLast : (x : Fin (S n)) ->
              x = last {n} ->
              IsLast x
 
+||| If IsLast applies to two members of a Fin, they are in fact the same
 both_last : (x : Fin (S n)) ->
             (y : Fin (S n)) ->
             IsLast x ->
@@ -59,24 +42,40 @@ both_last : (x : Fin (S n)) ->
             x = y
 both_last x y (ItIsLast x x_prf) (ItIsLast y y_prf) = trans x_prf $ sym y_prf
 
+||| Covering function to determine if a Fin is the last
 is_it_last : (x : Fin (S n)) ->
              Dec (IsLast x)
 is_it_last x with (decEq x last)
   | Yes prf = Yes $ ItIsLast x prf
   | No contra = No (\(ItIsLast _ eq) => contra eq)
 
-cant_strengthen_last : (n : Nat) ->
-                       (x : Fin (S n)) ->
-                       IsLast x ->
-                       strengthen x = Left x
-cant_strengthen_last Z FZ (ItIsLast FZ prf) = Refl
-cant_strengthen_last (S k) FZ (ItIsLast FZ prf) = absurd $ FZNotFS prf
-cant_strengthen_last (S k) (FS x) (ItIsLast (FS x) prf) =
-  trans exact $ sym $ cong {f=Left} prf where
-    exact : strengthen (FS x) = Left (FS last)
-    exact = let rec = cant_strengthen_last k x $ ItIsLast x $ FSinjective prf
-            in ?exact_hole
+||| If some x is the last element of a Fin, so is FS applied to x
+fs_last_is_last : (x : Fin (S n)) ->
+                  IsLast x ->
+                  IsLast (FS x)
+fs_last_is_last x (ItIsLast x x_eq) = ItIsLast (FS x) $ cong x_eq
 
+||| If FS x is the last element of a fin, so is x
+rem_fs_last_is_last : (x : Fin (S n)) ->
+                      IsLast (FS x) ->
+                      IsLast x
+rem_fs_last_is_last x (ItIsLast (FS x) x_eq) = ItIsLast x $ FSinjective x_eq
+
+||| Except for Fin 1, last takes the form of FS x
+last_is_fs : (k : Nat) ->
+             (x : Fin (S k) ** last {n=S k} = FS x)
+last_is_fs Z = (FZ ** Refl)
+last_is_fs (S k) = let (rec_val ** rec_prf) = last_is_fs k
+                   in (FS rec_val ** cong rec_prf)
+
+||| Weakening a Fin never results in the last element
+weaken_not_last : (x : Fin (S n)) ->
+                  Not (IsLast (weaken x))
+weaken_not_last FZ (ItIsLast FZ last_eq) = absurd $ FZNotFS last_eq
+weaken_not_last {n = S k} (FS x) last_prf = weaken_not_last x $
+  rem_fs_last_is_last _ last_prf
+
+||| The weaken function is injective
 weaken_inj : (x : Fin n) ->
              (y : Fin n) ->
              weaken x = weaken y ->
@@ -86,68 +85,61 @@ weaken_inj (FS x) FZ eq = absurd $ FZNotFS $ sym eq
 weaken_inj FZ (FS y) eq = absurd $ FZNotFS eq
 weaken_inj (FS x) (FS y) eq = cong $ weaken_inj x y $ FSInjective _ _ eq
 
-strengthen_fz_left : Left (FZ {k=Z}) = strengthen (FZ {k=Z})
-strengthen_fz_left = Refl
-
-strengthen_fz_right : (j : Nat) ->
-                      Right (FZ {k=j}) = strengthen (FZ {k=S j})
-strengthen_fz_right j = Refl
-
-strengthen_fs_left : (n : Nat) ->
-                     (x : Fin (S n)) ->
-                     IsLast (FS x) ->
-                     Left (FS x) = strengthen (FS x)
-strengthen_fs_left n x (ItIsLast (FS x) prf) = ?strengthen_fs_left_hole
-
-strengthen_fz_not_fs : (n : Nat) ->
-                       strengthen (FZ {k=n}) = strengthen (FS x) ->
-                       Void
-strengthen_fz_not_fs Z eq = absurd $ FZNotFS $ leftInjective eq
-strengthen_fz_not_fs {x=FZ} (S k) eq = ?str_hole
-strengthen_fz_not_fs {x=FS k} (S j) eq = ?str_hole_2
-{-strengthen_fz_not_fs {x} (S k) eq with (strengthen (FS x))
-  | (Left l) = absurd $ leftNotRight $ sym eq
-  | (Right FZ) = ?absurd_hole
-  | (Right (FS y)) = absurd $ FZNotFS $ rightInjective eq -}
-
-remove_fs_strengthen : (x : Fin (S n)) ->
-                       (y : Fin (S n)) ->
-                       strengthen (FS x) = strengthen (FS y) ->
-                       strengthen x = strengthen y
-remove_fs_strengthen FZ FZ _ = Refl
-remove_fs_strengthen {n} FZ (FS x) eq = ?rem_hole_2
-remove_fs_strengthen (FS x) FZ eq = ?rem_hole_1
-remove_fs_strengthen (FS x) (FS y) eq = ?rem_hole_3
-
-strengthen_inj : (x : Fin (S n)) ->
-                 (y : Fin (S n)) ->
-                 strengthen x = strengthen y ->
-                 x = y
-strengthen_inj FZ FZ _ = Refl
-strengthen_inj {n} FZ (FS x) eq = ?str_inj_hole--absurd $ strengthen_fz_not_fs n eq
-strengthen_inj {n} (FS x) FZ eq = absurd $ strengthen_fz_not_fs n $ sym eq
-strengthen_inj {n=S k} (FS x) (FS y) eq =
-  cong $ strengthen_inj x y $ remove_fs_strengthen _ _ eq
+bij_fin_one : (m : Nat) ->
+              (f : Fin (S Z) -> Fin m) ->
+              Bijective f ->
+              m = S Z
+bij_fin_one Z f (Bij f f_inj f_srj) = absurd $ f FZ
+bij_fin_one (S Z) f (Bij f f_inj f_srj) = Refl
+bij_fin_one (S (S k)) f (Bij f f_inj f_srj) = exact where
+  step_1 : f FZ = FZ
+  step_1 = let (fz ** fz_eq) = f_srj FZ in case fz of FZ => fz_eq
+  step_2 : f FZ = FS FZ
+  step_2 = let (fz ** fz_eq) = f_srj (FS FZ) in case fz of FZ => fz_eq
+  exact = absurd $ FZNotFS $ trans (sym step_1) step_2
 
 ||| Restrict a bijection from Fin (S n) to Fin (S m)
-rec_bij : (f : (Fin (S n) -> Fin (S m))) ->
-          Bijective f ->
-          (g : (Fin n -> Fin m) ** Bijective g)
-{-rec_bij {n} {m} f (Bij _ f_inj f_srj) with (is_it_last (f last))
-  | Yes (ItIsLast _ eq) = (g ** Bij g g_inj g_srj) where
-    g : Fin n -> Fin m
-    g x with (strengthen (f (weaken x)))
-      | Left y = ?left_hole
-      | Right y = y
-    g_inj : (x : Fin n) -> (y : Fin n) -> g x = g y -> x = y
-    g_inj x y eq' = weaken_inj _ _ $ f_inj (weaken x) (weaken y) ?g_inj_hole-- $ strengthen_inj _ _ eq'
-    g_srj z = ?gsrj_hole_2
-  | No contra = (g ** Bij g g_inj g_srj) where
-    g : Fin n -> Fin m
-    g_inj = ?ginj_hole_1
-    g_srj = ?gsrj_hole_2 -}
+restrict_bij : (n : Nat) ->
+               (m : Nat) ->
+               (f : (Fin (S n) -> Fin (S m))) ->
+               Bijective f ->
+               (g : (Fin n -> Fin m) ** Bijective g)
+restrict_bij Z Z f f_bij = (g ** Bij g g_inj g_srj) where
+  g : Fin Z -> Fin Z
+  g x impossible
+  g_inj x y impossible
+  g_srj z impossible
+restrict_bij Z (S j) f f_bij = absurd $ SIsNotZ $ succInjective (S j) Z $
+                               bij_fin_one (S (S j)) f f_bij
+restrict_bij (S j) Z f f_bij = let (f_inv ** f_prf) = bij_inv f f_bij
+                               in absurd $ SIsNotZ $ succInjective (S j) Z $
+                                  bij_fin_one (S (S j)) f_inv f_prf
+restrict_bij (S j) (S k) f (Bij f f_inj f_srj) with (decEq (f FZ) FZ)
+  | Yes eq = (g ** Bij g g_inj g_srj) where
+    lemma_f_fs : (x : Fin (S j)) -> (y : Fin (S k) ** f (FS x) = FS y)
+    lemma_f_fs x with (f (FS x))
+      | FZ with (decEq FZ (FS x))
+        | Yes eq' = absurd $ FZNotFS eq'
+      | FS x' = (x' ** Refl)
+    g : Fin (S j) -> Fin (S k)
+    g x = fst $ lemma_f_fs x
+    from_lemma : (x : Fin (S j)) -> f (FS x) = FS (g x)
+    from_lemma x = snd $ lemma_f_fs x
+    g_inj : (x : Fin (S j)) -> (y : Fin (S j)) -> g x = g y -> x = y
+    g_inj x y g_eq = FSinjective $ f_inj (FS x) (FS y) $ exact where
+      exact = rewrite from_lemma x in rewrite from_lemma y in cong g_eq
+    g_srj : (z : Fin (S k)) -> (x : Fin (S j) ** g x = z)
+    g_srj z =
+      let (f_val ** f_prf) = f_srj (FS z)
+      in case decEq f_val FZ of
+              Yes eq' => absurd $ FZNotFS $ trans (trans (sym eq)
+                         (cong (sym eq'))) f_prf
+              No ineq' => let FS x = f_val
+                              exact = trans (sym (from_lemma x)) f_prf
+                          in (x ** FSinjective exact)
+  | No ineq = ?no_hole
 
-||| If there is a bijectiom between two Fin data types, they are the same Fin
+||| If there is a bijection between two Fin data types, they are the same Fin
 bij_fins : (n : Nat) ->
            (m : Nat) ->
            (f : Fin (S n) -> Fin (S m)) ->
@@ -159,16 +151,21 @@ bij_fins Z (S m) f (Bij _ f_inj f_srj) with (f_srj FZ, f_srj (FS FZ))
 bij_fins (S n) Z f (Bij _ f_inj f_srj) =
   case decEq (f FZ) (f (FS FZ)) of Yes eq => absurd $ FZNotFS $ f_inj _ _ eq
 bij_fins (S n) (S m) f bij =
-  let (g ** g_prf) = rec_bij f bij in cong $ bij_fins _ _ g g_prf
+  let (g ** g_prf) = restrict_bij _ _ f bij in cong $ bij_fins _ _ g g_prf
 
 ||| Between two equipotent sets, injection and surjection correspond
-finite_sets_inj_srj : (a : Type) ->
-                      (b : Type) ->
-                      (n : Nat) ->
-                      a ~= S n ->
-                      b ~= S n ->
-                      (f : a -> b) ->
-                      Injective f <-> Surjective f
+fin_inj_srj : (a : Type) ->
+              (b : Type) ->
+              (n : Nat) ->
+              a ~= S n ->
+              b ~= S n ->
+              (f : a -> b) ->
+              Injective f <-> Surjective f
+fin_inj_srj a b n (Finite _ _ (g ** Bij g g_inj g_srj))
+                  (Finite _ _ (h ** Bij h h_inj h_srj)) f = (fwd, bwd) where
+  fwd (Inj _ f_inj) = (Srj _ f_srj) where
+    f_srj z = ?f_srj_hole_fins
+  bwd (Srj _ f_srj) = ?bwd_hole
 
 ||| A data type can only have one cardinality
 cardinality_unique : (a : Type) ->
