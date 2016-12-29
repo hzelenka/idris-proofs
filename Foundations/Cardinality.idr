@@ -24,67 +24,6 @@ data (~=) : Type -> Nat -> Type where
 Aleph : Type -> Type
 Aleph a = (f : (a -> Nat) ** Bijective f)
 
--- The proofs up to bij_fin_one probably won't end up being necessary
--- I'm keeping them around just in case
-
-||| Predicate expressing that a Fin is the largest element in its type
-data IsLast : Fin (S n) ->
-              Type where
-  ItIsLast : (x : Fin (S n)) ->
-             x = last {n} ->
-             IsLast x
-
-||| If IsLast applies to two members of a Fin, they are in fact the same
-both_last : (x : Fin (S n)) ->
-            (y : Fin (S n)) ->
-            IsLast x ->
-            IsLast y ->
-            x = y
-both_last x y (ItIsLast x x_prf) (ItIsLast y y_prf) = trans x_prf $ sym y_prf
-
-||| Covering function to determine if a Fin is the last
-is_it_last : (x : Fin (S n)) ->
-             Dec (IsLast x)
-is_it_last x with (decEq x last)
-  | Yes prf = Yes $ ItIsLast x prf
-  | No contra = No (\(ItIsLast _ eq) => contra eq)
-
-||| If some x is the last element of a Fin, so is FS applied to x
-fs_last_is_last : (x : Fin (S n)) ->
-                  IsLast x ->
-                  IsLast (FS x)
-fs_last_is_last x (ItIsLast x x_eq) = ItIsLast (FS x) $ cong x_eq
-
-||| If FS x is the last element of a fin, so is x
-rem_fs_last_is_last : (x : Fin (S n)) ->
-                      IsLast (FS x) ->
-                      IsLast x
-rem_fs_last_is_last x (ItIsLast (FS x) x_eq) = ItIsLast x $ FSinjective x_eq
-
-||| Except for Fin 1, last takes the form of FS x
-last_is_fs : (k : Nat) ->
-             (x : Fin (S k) ** last {n=S k} = FS x)
-last_is_fs Z = (FZ ** Refl)
-last_is_fs (S k) = let (rec_val ** rec_prf) = last_is_fs k
-                   in (FS rec_val ** cong rec_prf)
-
-||| Weakening a Fin never results in the last element
-weaken_not_last : (x : Fin (S n)) ->
-                  Not (IsLast (weaken x))
-weaken_not_last FZ (ItIsLast FZ last_eq) = absurd $ FZNotFS last_eq
-weaken_not_last {n = S k} (FS x) last_prf = weaken_not_last x $
-  rem_fs_last_is_last _ last_prf
-
-||| The weaken function is injective
-weaken_inj : (x : Fin n) ->
-             (y : Fin n) ->
-             weaken x = weaken y ->
-             x = y
-weaken_inj FZ FZ _ = Refl
-weaken_inj (FS x) FZ eq = absurd $ FZNotFS $ sym eq
-weaken_inj FZ (FS y) eq = absurd $ FZNotFS eq
-weaken_inj (FS x) (FS y) eq = cong $ weaken_inj x y $ FSInjective _ _ eq
-
 bij_fin_one : (m : Nat) ->
               (f : Fin (S Z) -> Fin m) ->
               Bijective f ->
@@ -137,7 +76,44 @@ restrict_bij (S j) (S k) f (Bij f f_inj f_srj) with (decEq (f FZ) FZ)
               No ineq' => let FS x = f_val
                               exact = trans (sym (from_lemma x)) f_prf
                           in (x ** FSinjective exact)
-  | No ineq = ?no_hole
+  | No ineq with (f FZ)
+    | FS x = (g ** Bij g g_inj g_srj) where
+      preimage_fz : (preim : Fin (S j) ** f (FS preim) = FZ)
+      preimage_fz = case f_srj FZ of (FS preim ** im_prf) => (preim ** im_prf)
+      preimage_fz_val : Fin (S j)
+      preimage_fz_val = fst preimage_fz
+      preimage_fz_prf : f (FS preimage_fz_val) = FZ
+      preimage_fz_prf = snd preimage_fz
+      g : Fin (S j) -> Fin (S k)
+      g f1 with (decEq f1 preimage_fz_val)
+        | Yes eq' = x
+        | No ineq' = case f (FS f1) of FS f2 => f2
+      g_of_preimage : g preimage_fz_val = x
+      g_of_preimage with (decEq preimage_fz_val preimage_fz_val)
+        | Yes eq' = Refl
+      g_not_preimage : (y : Fin (S j)) ->
+                       Not (y = preimage_fz_val) ->
+                       FS (g y) = f (FS y)
+      g_not_preimage y ineq with (decEq y preimage_fz_val)
+        | No ineq' with (f (FS y))
+          | FS f2 = Refl
+      not_z_not_preimage : (val : Fin (S j)) ->
+                           Not (g val = FZ) ->
+                           Not (val = preimage_fz_val)
+      g_inj : (xx : Fin (S j)) -> (y : Fin (S j)) -> g xx = g y -> xx = y
+      g_inj x' y' g_eq with (decEq x' preimage_fz_val)
+        | Yes eq' = ?show_just_preimage_to_x
+        | No ineq' = ?no_ineq_hole
+      g_srj : (z : Fin (S k)) -> (x : Fin (S j) ** g x = z)
+      g_srj z with (decEq x z)
+        | Yes eq' = (preimage_fz_val ** trans g_of_preimage eq')
+        | No ineq' = let (FS f_val ** f_prf) = f_srj (FS z)
+                     in case decEq f_val preimage_fz_val of
+                             Yes eq'' => absurd $ FZNotFS $
+                                         trans (sym preimage_fz_prf) $
+                                         rewrite (sym eq'') in f_prf
+                             No ineq'' => (f_val ** FSinjective (trans
+                                          (g_not_preimage f_val ineq'') f_prf))
 
 ||| If there is a bijection between two Fin data types, they are the same Fin
 bij_fins : (n : Nat) ->
