@@ -108,10 +108,10 @@ restrict_bij_fz_not_fixed m n f w f_of_fz (Bij f f_inj f_srj) =
     g_not_preimage x ineq with (decEq x preimage_fz_val)
       | No ineq' with (f (FS x))
         | FS y = Refl
-    g_inj : (x : Fin m) -> (y : Fin m) -> g x = g y -> x = y
-    g_inj x y g_eq with (decEq x preimage_fz_val, decEq y preimage_fz_val)
+    g_inj : (xx : Fin m) -> (yy : Fin m) -> g xx = g yy -> xx = yy
+    g_inj xx yy g_eq with (decEq xx preimage_fz_val, decEq yy preimage_fz_val)
       | (Yes x_eq, Yes y_eq)  = ?yesyeshole
-      | (No x_ineq, No y_ineq) = ?nonohole -- Idris does not complain if I mark
+      | (No x_ineq, No y_ineq) impossible -- = ?nonohole -- Idris does not complain if I mark
                                            -- this case impossible, which must
                                            -- indicate I screwed up somewhere
     g_srj : (z : Fin n) -> (x : Fin m ** g x = z)
