@@ -18,47 +18,15 @@ lte_successor (S k) (S j) lte_contra lte_prf =
 division_algorithm : (a : Nat) -> -- S a will be used to avoid division by zero
                      (b : Nat) ->
                      (q : Nat ** r : Nat ** (b = q * (S a) + r, LTE r a))
--- Case 1: The dividend is equal to zero. Let the quotient and remainder both
--- be zero. Zero times the divisor plus zero is equal to zero, so the first
--- condition holds. Also, zero is less than or equal to zero, so the second
--- condition holds.
 division_algorithm a Z = (0 ** 0 ** (Refl, LTEZero))
--- Case 2: The divisor is equal to one. Let the quotient equal the dividend
--- and the remainder equal zero. One times the dividend plus zero is equal to
--- the dividend by additive and multiplicative identity, so the first condition
--- holds. Also, zero is less than or equal to zero, so the second condition
--- also holds.
 division_algorithm Z b = (b ** Z ** (b_eq, LTEZero)) where
   b_eq = rewrite (multOneRightNeutral b) in
          rewrite (plusZeroRightNeutral b) in Refl
--- Case 3: Neither the dividend nor the divisor equals zero. Then both are the
--- successor of another natural number, say k and j. Apply induction on the
--- divisor with Case 1 as the base case. For the inductive case, assume the
--- division algorithm holds for the divisor and the pred of the dividend.
 division_algorithm (S k) (S j) with (division_algorithm (S k) j)
   | (q ** r ** (eq_prf, lte_prf)) with (isLTE r k)
-    -- Subcase 1: The remainder in the preceding case was less than or equal to
-    -- the predecessor of the divisor. Let the quotient equal the previous
-    -- quotient and the remainder equal the succ of the previous remainder. The
-    -- quotient times the divisor plus the new remainder may be algebraically
-    -- shown to equal the new dividend, so the first condition holds. Also, the
-    -- second condition holds bc succ preserves LTE.
     | Yes prf = (q ** S r ** (j_eq, (LTESucc prf))) where
       j_eq = rewrite (sym (plusSuccRightSucc (mult q (S (S k))) r)) in
              rewrite eq_prf in Refl
-    -- Subcase 2: The previous remainder was not less than or equal to the pred
-    -- of the divisor. Then it must equal the divisor, because otherwise we
-    -- would have that the remainder exceeded the divisor, violating that the
-    -- division algorithm held. Let the quotient equal the successor of the
-    -- previous quotient and the remainder equal zero. We have:
-    --                  j = q * (S k) + r
-    -- and we need to show that
-    --                  S j = (S q) * (S k)
-    -- But we know that r = S k, so we can simplify the former to
-    --                  S j = q * (S k) + (S k)
-    -- which clearly reduces to what we were trying to prove. As for the latter
-    -- condition, it is clearly satisfied because our remainder of zero is LTE
-    -- to everything.
     | No contra = (S q ** Z ** (s_j_eq, LTEZero)) where
       s_j_eq = let s_k_eq_r = sym (lte_successor r k contra lte_prf)
                    s_s_k_eq_s_r = cong {f=S} s_k_eq_r in
