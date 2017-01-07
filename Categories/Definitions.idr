@@ -3,8 +3,8 @@ module Definitions
 %default total
 %access public export
 
-||| Using obj asa the determining parameter feels _wrong_ somehow, but it was
-||| the only way to get the opposite category to typecheck
+||| Using obj as the determining parameter feels _wrong_ somehow, but it makes
+||| some code terser
 interface Category (obj : Type) (mor : obj -> obj -> Type) | obj where
   catId : (o : obj) ->
           mor o o
@@ -19,25 +19,6 @@ interface Category (obj : Type) (mor : obj -> obj -> Type) | obj where
   catIdIsId : (f : mor o1 o2) ->
               (f `catComp` (catId o2) = f,
                (catId o1) `catComp` f = f)
-
-||| Morphisms in the opposite category
-comor : Category obj mor => obj -> obj -> Type
-comor {mor} o1 o2 = mor o2 o1
-
-||| Function composition in the opposite category
-cocatComp : Category obj mor =>
-             comor {mor} o1 o2 ->
-             comor {mor} o2 o3 ->
-             comor {mor} o1 o3
-cocatComp {mor} f g = catComp {mor} g f
-
-implementation Category obj mor =>
-               Category obj (Definitions.comor {obj} {mor}) where
-  catId o = catId o
-  catComp = cocatComp {obj}
-  catCompAssoc f g h = sym $ catCompAssoc {obj} h g f
-  catIdIsId {mor} f = let (right, left) = catIdIsId {obj} {mor} f
-                         in (left, right)
 
 ||| Left-cancellable morphism
 data Monomorphism : Category obj mor =>
@@ -156,69 +137,3 @@ invIsoUniq {mor} f (Iso f g sect (Retr f g retr)) g' (Sect f g' sect') retr' =
       step4 = trans step3 $ cong {f=\val=>catComp {mor} val g'} $ retr
       step5 = trans step4 $ snd $ catIdIsId {mor} g'
   in sym step5
-
-||| Object with exactly one morphism to each other object
-data InitialObject : Category obj mor =>
-                     obj ->
-                     Type where
-  IsInitial : Category obj mor =>
-              (o : obj) ->
-              ((o' : obj) ->
-               (f : mor o o' ** ((g : (mor o o')) ->
-                                  f = g))) ->
-              InitialObject o
-
-||| All initial objects in a category are isomorphic
-initialObjIso : Category obj mor =>
-                (o1 : obj) ->
-                InitialObject o1 ->
-                (o2 : obj) ->
-                InitialObject o2 ->
-                (f : mor o1 o2 ** Isomorphism {mor} f)
-initialObjIso {mor} o1 (IsInitial o1 o1_prf) o2 (IsInitial o2 o2_prf) =
-  (f ** Iso {mor} f g (Sect {mor} f g sect) (Retr {mor} f g retr)) where
-    f : mor o1 o2
-    f = fst $ o1_prf o2
-    id1Uniq : (f' : mor o1 o1) -> f' = catId o1
-    id1Uniq f' with (o1_prf o1)
-      | (uniq_f ** prf) = trans (sym (prf f')) $ prf $ catId o1
-    g : mor o2 o1
-    g = fst $ o2_prf o1
-    id2Uniq : (g' : mor o2 o2) -> g' = catId o2
-    id2Uniq g' with (o2_prf o2)
-      | (uniq_g ** prf) = trans (sym (prf g')) $ prf $ catId o2
-    sect = id1Uniq $ catComp {mor} f g
-    retr = id2Uniq $ catComp {mor} g f
-
-||| Object with exactly one morphism to each other object
-data TerminalObject : Category obj mor =>
-                      obj ->
-                      Type where
-  IsTerminal : Category obj mor =>
-               (o : obj) ->
-               ((o' : obj) ->
-                (f : mor o' o ** ((g : (mor o' o)) ->
-                                  f = g))) ->
-               TerminalObject o
-
-||| All terminal objects in a category are isomorphic
-terminalObjIso : Category obj mor =>
-                 (o1 : obj) ->
-                 TerminalObject o1 ->
-                 (o2 : obj) ->
-                 TerminalObject o2 ->
-                 (f : mor o1 o2 ** Isomorphism {mor} f)
-terminalObjIso {mor} o1 (IsTerminal o1 o1_prf) o2 (IsTerminal o2 o2_prf) =
-  (f ** Iso {mor} f g (Sect {mor} f g sect) (Retr {mor} f g retr)) where
-    f : mor o1 o2
-    f = fst $ o2_prf o1
-    id1Uniq : (f' : mor o1 o1) -> f' = catId o1
-    id1Uniq f' with (o1_prf o1)
-      | (uniq_f ** prf) = trans (sym (prf f')) $ prf $ catId o1
-    g : mor o2 o1
-    g = fst $ o1_prf o2
-    id2Uniq : (g' : mor o2 o2) -> g' = catId o2
-    id2Uniq g' with (o2_prf o2)
-      | (uniq_g ** prf) = trans (sym (prf g')) $ prf $ catId o2
-    sect = id1Uniq $ catComp {mor} f g
-    retr = id2Uniq $ catComp {mor} g f
