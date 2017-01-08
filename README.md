@@ -2,13 +2,8 @@
 
 A collection of Idris files proving important concepts in mathematics or whatever I feel like.
 
-Short term to-do list:
+Currently working in Categories folder. Short term to-do list:
 
-- Cyclic groups
-- Multiplicative groups
-- Permutation groups
-- Cayley's theorem
-- Dihedral groups
-- Cosets
-- Quotient groups
-- Fundamental homomorphism theorem
+- Get the definitions in Categories/Products.idr to "work"
+- Categorical definitions of groupoids, monoids, groups
+- Opposite categories
