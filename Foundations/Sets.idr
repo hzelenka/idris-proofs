@@ -1,149 +1,162 @@
 module Sets
 
+import Data.Vect
+import Foundations.Functions
+
 %default total
 %access public export
 
-||| Set with a guarantee that the property is decidable
-record DecSet a where
-  constructor MkSet
-  prop : (x : a) -> Type
-  dec : (x : a) -> Dec (prop x)
+data Set : Type -> Type where
+  MkSet : (a : Type) ->
+          (p : a -> Type) ->
+          Set a
 
-||| Set of all values not satisfying the property of another set
-compl : DecSet a -> DecSet a
-compl s = MkSet (\x => Not (prop s x)) dec_prf where
-  dec_prf x with (dec s x)
-    | Yes prf   = No (\contra => contra prf)
-    | No contra = Yes contra
+getProp : Set a -> a -> Type
+getProp (MkSet a p) = p
+
+compl : Set a -> Set a
+compl (MkSet a p) = MkSet a $ \x => Not (p x)
 
 infixl 2 #
-||| DecSet element
+||| Set element
 data (#) : a ->
-           DecSet a ->
+           Set a ->
            Type where
   IsElem : (x : a) ->
-           (s : DecSet a) ->
-           prop s x ->
+           (s : Set a) ->
+           getProp s x ->
            x # s
 
 infixl 1 :<:
-||| DecSet subset
-data (:<:) : DecSet a ->
-             DecSet a ->
+||| Subset
+data (:<:) : Set a ->
+             Set a ->
              Type where
-  IsSubset : (s1 : DecSet a) ->
-             (s2 : DecSet a) ->
+  IsSubset : (s1 : Set a) ->
+             (s2 : Set a) ->
              ((x : a) ->
               x # s1 ->
               x # s2) ->
-              s1 :<: s2
+             s1 :<: s2
+
+||| If s1 is a subset of s2 and s2 is a subset of s3, s1 is a subset of s3
+subsetTransitive : (s1 : Set a) ->
+                   (s2 : Set a) ->
+                   (s3 : Set a) ->
+                   s1 :<: s2 ->
+                   s2 :<: s3 ->
+                   s1 :<: s3
+subsetTransitive s1 s2 s3 (IsSubset _ _ prf1) (IsSubset _ _ prf2) =
+  IsSubset _ _ (\x, elem_prf => prf2 x (prf1 x elem_prf))
 
 infixl 1 :=:
-||| DecSet equality
-data (:=:) : DecSet a ->
-             DecSet a ->
+||| Set equality
+data (:=:) : Set a ->
+             Set a ->
              Type where
-  SubsetEq : (s1 : DecSet a) ->
-             (s2 : DecSet a) ->
-             (fwd : ((x : a) ->
-                     x # s1 ->
-                     x # s2)) ->
-             (bwd : ((x : a) ->
-                     x # s2 ->
-                     x # s1)) ->
+  SubsetEq : (s1 : Set a) ->
+             (s2 : Set a) ->
+             ((x : a) ->
+              x # s1 <-> x # s2) ->
              s1 :=: s2
 
 infixl 5 \/
-||| DecSet union
-(\/) : DecSet a -> DecSet a -> DecSet a
-p \/ q = MkSet (\x => Either (prop p x) (prop q x)) dec_prf where
-  dec_prf el with (dec p el, dec q el)
-    | (Yes p_prf, Yes q_prf)     = Yes $ Left p_prf
-    | (Yes p_prf, No q_contra)   = Yes $ Left p_prf
-    | (No p_contra, Yes q_prf)   = Yes $ Right q_prf
-    | (No p_contra, No q_contra) = No (\e => case e of
-                                        Left prf => p_contra prf
-                                        Right prf => q_contra prf)
+||| Set union
+(\/) : Set a -> Set a -> Set a
+(MkSet a p) \/ (MkSet a q) = MkSet a (\x => Either (p x) (q x))
+
+||| Set union is commutative up to set equivalence
+unionCommutes : (s1 : Set a) ->
+                (s2 : Set a) ->
+                s1 \/ s2 :=: s2 \/ s1
+unionCommutes (MkSet a p) (MkSet a q) =
+  SubsetEq _ _ $ \x => (\(IsElem _ _ elem_prf) => IsElem _ _ $ mirror elem_prf,
+                        \(IsElem _ _ elem_prf) => IsElem _ _ $ mirror elem_prf)
 
 infixl 6 /\
-||| DecSet intersection
-(/\) : DecSet a -> DecSet a -> DecSet a
-p /\ q = MkSet (\x => (prop p x, prop q x)) dec_prf where
-  dec_prf el with (dec p el, dec q el)
-    | (Yes p_prf, Yes q_prf)     = Yes (p_prf, q_prf)
-    | (Yes p_prf, No q_contra)   = No (\(_,q) => q_contra q)
-    | (No p_contra, Yes q_prf)   = No (\(p, _) => p_contra p)
-    | (No p_contra, No q_contra) = No (\(p, _) => p_contra p)
+||| Set intersection
+(/\) : Set a -> Set a -> Set a
+(MkSet a p) /\ (MkSet a q) = MkSet a (\x => (p x, q x))
+
+||| Set intersection is commutative up to set equivalence
+intersectionCommutes : (s1 : Set a) ->
+                       (s2 : Set a) ->
+                       s1 /\ s2 :=: s2 /\ s1
+intersectionCommutes (MkSet a p) (MkSet a q) =
+  SubsetEq _ _ $ \x => (\(IsElem _ _ elem_prf) => IsElem _ _ $ swap elem_prf,
+                        \(IsElem _ _ elem_prf) => IsElem _ _ $ swap elem_prf)
 
 infixl 4 ~\
-||| DecSet difference
-(~\) : DecSet a -> DecSet a -> DecSet a
-p ~\ q = MkSet (\x => (prop p x, Not (prop q x))) dec_prf where
-  dec_prf el with (dec p el, dec q el)
-    | (Yes p_prf, Yes q_prf) = No (\(_,q_contra) => q_contra q_prf)
-    | (Yes p_prf, No q_contra) = Yes (p_prf, q_contra)
-    | (No p_contra, Yes q_prf) = No (\(p_prf,_) => p_contra p_prf)
-    | (No p_contra, No q_contra) = No (\(p_prf,_) => p_contra p_prf)
+||| Set difference
+(~\) : Set a -> Set a -> Set a
+(MkSet a p) ~\ (MkSet a q) = MkSet a (\x => (p x, Not (q x)))
 
--- TO DO: Symmetric difference
-
-||| Negation of p and negation of p implies negation of p or q
+||| Negation of p and negation of q implies negation of p or q
 de_morgan_1 : (x : a) ->
-              (p : DecSet a) ->
-              (q : DecSet a) ->
-              x # compl p /\ compl q ->
-              x # compl (p \/ q)
-de_morgan_1 x (MkSet prop_p dec_p) (MkSet prop_q dec_q) (IsElem x _ prf)
-  with (dec_p x, dec_q x)
-    | (Yes p_prf, Yes q_prf)     = absurd $ fst prf p_prf
-    | (Yes p_prf, No q_contra)   = absurd $ fst prf p_prf
-    | (No p_contra, Yes q_prf)   = absurd $ snd prf q_prf
-    | (No p_contra, No q_contra) = IsElem _ _ cases where
-      cases : Either (prop_p x) (prop_q x) -> Void
-      cases (Left p_prf) = p_contra p_prf
-      cases (Right q_prf) = q_contra q_prf
+              (s1 : Set a) ->
+              (s2 : Set a) ->
+              x # compl s1 /\ compl s2 ->
+              x # compl (s1 \/ s2)
+de_morgan_1 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
+  IsElem x _ (\y => case y of Left p_prf => fst prf p_prf
+                              Right q_prf => snd prf q_prf)
 
 ||| Negation of p or q implies negation of p and negation of q
 de_morgan_2 : (x : a) ->
-              (p : DecSet a) ->
-              (q : DecSet a) ->
-              x # compl (p \/ q) ->
-              x # compl p /\ compl q
-de_morgan_2 x (MkSet prop_p dec_p) (MkSet prop_q dec_q) (IsElem x _ prf)
-  with (dec_p x, dec_q x)
-    | (Yes p_prf, Yes q_prf)     = absurd $ prf $ Left p_prf
-    | (Yes p_prf, No q_contra)   = absurd $ prf $ Left p_prf
-    | (No p_contra, Yes q_prf)   = absurd $ prf $ Right q_prf
-    | (No p_contra, No q_contra) = IsElem _ _ (p_contra, q_contra)
+              (s1 : Set a) ->
+              (s2 : Set a) ->
+              x # compl (s1 \/ s2) ->
+              x # compl s1 /\ compl s2
+de_morgan_2 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
+  IsElem x _ (\p_prf => prf (Left p_prf), \q_prf => prf (Right q_prf))
 
 ||| Negation of p or negation of q implies negation of p and q
 de_morgan_3 : (x : a) ->
-              (p : DecSet a) ->
-              (q : DecSet a) ->
-              x # compl p \/ compl q ->
-              x # compl (p /\ q)
-de_morgan_3 x (MkSet prop_p dec_p) (MkSet prop_q dec_q) (IsElem x _ prf)
-  with (dec_p x, dec_q x) proof p
-    | (Yes p_prf, Yes q_prf)     = absurd $ cases prf where
-       cases : Either (prop_p x -> Void) (prop_q x -> Void) -> Void
-       cases (Left p_absurd) = p_absurd p_prf
-       cases (Right q_absurd) = q_absurd q_prf
-    | (Yes p_prf, No q_contra)   = IsElem _ _ (\(_,q_prf) => q_contra q_prf)
-    | (No p_contra, Yes q_prf)   = IsElem _ _ (\(p_prf,_) => p_contra p_prf)
-    | (No p_contra, No q_contra) = IsElem _ _ cases where
-      cases : (prop_p x, prop_q x) -> Void
-      cases (p_prf, q_prf) = case prf of Left p_absurd => p_absurd p_prf
-                                         Right q_absurd => q_absurd q_prf
+              (s1 : Set a) ->
+              (s2 : Set a) ->
+              x # compl s1 \/ compl s2 ->
+              x # compl (s1 /\ s2)
+de_morgan_3 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
+  IsElem x _ (\(p_prf,q_prf) => case prf of Left p_contra => p_contra p_prf
+                                            Right q_contra => q_contra q_prf)
 
-||| Negation of p and q implies negation of p or negation of q
-de_morgan_4 : (x : a) ->
-              (p : DecSet a) ->
-              (q : DecSet a) ->
-              x # compl (p /\ q) ->
-              x # compl p \/ compl q
-de_morgan_4 x (MkSet prop_p dec_p) (MkSet prop_q dec_q) (IsElem x _ prf)
-  with (dec_p x, dec_q x)
-    | (Yes p_prf, Yes q_prf)     = absurd $ prf (p_prf, q_prf)
-    | (Yes p_prf, No q_contra)   = IsElem _ _ (Right q_contra)
-    | (No p_contra, Yes q_prf)   = IsElem _ _ (Left p_contra)
-    | (No p_contra, No q_contra) = IsElem _ _ (Left p_contra)
+-- De Morgan's 4th law (the converse of the above) is unprovable constructively
+
+||| Set of all subsets
+data Powerset : (s : Set a) ->
+                Set (Set a) ->
+                Type where
+  IsPowerset : (s : Set a) ->
+               (ps : Set (Set a)) ->
+               ((s' : Set a) ->
+                s' :<: s <-> s' # ps) ->
+               Powerset s ps
+
+||| The powerset is unique up to set equivalence
+powersetUniq : (s : Set a) ->
+               (ps : Set (Set a)) ->
+               (ps' : Set (Set a)) ->
+               Powerset s ps ->
+               Powerset s ps' ->
+               ps :=: ps'
+powersetUniq (MkSet a s_prop) (MkSet _ ps_prop) (MkSet _ ps_prop')
+             (IsPowerset _ _ ps_prf) (IsPowerset _ _ ps_prf') =
+  SubsetEq _ _ (\x => (fwd, bwd)) where
+    fwd : x # MkSet (Set a) ps_prop -> x # MkSet (Set a) ps_prop'
+    fwd elem_prf with (ps_prf x, ps_prf' x)
+      | ((_, ps_bwd), (ps_fwd', _)) = ps_fwd' $ ps_bwd elem_prf
+    bwd : x # MkSet (Set a) ps_prop' -> x # MkSet (Set a) ps_prop
+    bwd elem_prf with (ps_prf x, ps_prf' x)
+      | ((ps_fwd, _), (_, ps_bwd')) = ps_fwd $ ps_bwd' elem_prf
+
+||| Union of a collection of sets
+unionOver : Vect n (Set a) ->
+            Set a
+unionOver [] = MkSet a (\_ => Void) -- Union over empty set is the empty set
+unionOver (x :: xs) = x \/ unionOver xs
+
+||| Intersection of a collection of sets
+intersectionOver : Vect n (Set a) ->
+                   Set a
+intersectionOver [] = MkSet a (\_ => ()) -- Intr over empty set is the universe
+intersectionOver (x :: xs) = x /\ intersectionOver xs

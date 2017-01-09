@@ -2,7 +2,6 @@ module Cyclics
 
 import Data.Fin
 import Foundations.Cardinality
-import Foundations.Sets
 import Foundations.Functions
 import Algebra.Groups
 import Algebra.Homomorphisms
