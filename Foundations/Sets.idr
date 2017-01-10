@@ -11,11 +11,17 @@ data Set : Type -> Type where
           (p : a -> Type) ->
           Set a
 
+Empty : (a : Type) -> Set a
+Empty a = MkSet a $ \_ => Void
+
+Universe : (a : Type) -> Set a
+Universe a = MkSet a $ \_ => ()
+
 getProp : Set a -> a -> Type
 getProp (MkSet a p) = p
 
 compl : Set a -> Set a
-compl (MkSet a p) = MkSet a $ \x => Not (p x)
+compl (MkSet a p) = MkSet a $ \x => Not $ p x
 
 infixl 2 #
 ||| Set element
@@ -32,79 +38,157 @@ infixl 1 :<:
 data (:<:) : Set a ->
              Set a ->
              Type where
-  IsSubset : (s1 : Set a) ->
-             (s2 : Set a) ->
+  IsSubset : (s1, s2 : Set a) ->
              ((x : a) ->
               x # s1 ->
               x # s2) ->
              s1 :<: s2
 
-||| If s1 is a subset of s2 and s2 is a subset of s3, s1 is a subset of s3
-subsetTransitive : (s1 : Set a) ->
-                   (s2 : Set a) ->
-                   (s3 : Set a) ->
+||| The empty set is a subset of all sets
+emptySubset : (s : Set a) ->
+              Empty a :<: s
+emptySubset {a} s = IsSubset (Empty a) s $ \x, (IsElem x _ void) => absurd void
+
+||| Being a subset is reflexive
+subsetRefl : (s : Set a) ->
+             s :<: s
+subsetRefl s = IsSubset s s $ \_ => id
+
+||| Being a subset is transitive
+subsetTransitive : (s1, s2, s3 : Set a) ->
                    s1 :<: s2 ->
                    s2 :<: s3 ->
                    s1 :<: s3
-subsetTransitive s1 s2 s3 (IsSubset _ _ prf1) (IsSubset _ _ prf2) =
-  IsSubset _ _ (\x, elem_prf => prf2 x (prf1 x elem_prf))
+subsetTransitive s1 s2 s3 (IsSubset s1 s2 prf1) (IsSubset s2 s3 prf2) =
+  IsSubset s1 s3 $ \x, elem => prf2 x $ prf1 x elem
 
 infixl 1 :=:
-||| Set equality
+||| Set equivalence
 data (:=:) : Set a ->
              Set a ->
              Type where
-  SubsetEq : (s1 : Set a) ->
-             (s2 : Set a) ->
-             ((x : a) ->
-              x # s1 <-> x # s2) ->
-             s1 :=: s2
+  Equiv : (s1, s2 : Set a) ->
+          ((x : a) ->
+           x # s1 <-> x # s2) ->
+          s1 :=: s2
+
+||| Set equivalence is reflexive
+equivRefl : (s1 : Set a) ->
+            s1 :=: s1
+equivRefl s1 = Equiv s1 s1 $ \_ => (id, id)
+
+||| Set equivalence is transitive
+equivTrans : (s1, s2, s3 : Set a) ->
+             s1 :=: s2 ->
+             s2 :=: s3 ->
+             s1 :=: s3
+equivTrans s1 s2 s3 (Equiv s1 s2 iff_12) (Equiv s2 s3 iff_23) =
+  Equiv s1 s3 $
+    \x => (\elem => fst (iff_23 x) $ fst (iff_12 x) elem,
+           \elem => snd (iff_12 x) $ snd (iff_23 x) elem)
+
+||| Set equivalence is symmetric
+equivSym : (s1, s2 : Set a) ->
+           s1 :=: s2 ->
+           s2 :=: s1
+equivSym s1 s2 (Equiv s1 s2 iff) = Equiv s2 s1 $ \x => swap $ iff x
+
+||| If two sets are propositionally equal, they must be equivalent as sets
+||| The converse has extensionality issues: s1 and s2 might share the same
+||| elements while their properties are defined differently
+propEqIsSetEquiv : (s1, s2 : Set a) ->
+                   s1 = s2 ->
+                   s1 :=: s2
+propEqIsSetEquiv s1 s2 eq = rewrite eq in equivRefl s2
 
 infixl 5 \/
 ||| Set union
 (\/) : Set a -> Set a -> Set a
-(MkSet a p) \/ (MkSet a q) = MkSet a (\x => Either (p x) (q x))
+(MkSet a p) \/ (MkSet a q) = MkSet a $ \x => Either (p x) (q x)
+
+||| The empty set is an identity under set union
+unionEmptyNeutral : (s : Set a) ->
+                    (s \/ Empty a :=: s, Empty a \/ s :=: s)
+unionEmptyNeutral (MkSet s prop) = (left, right) where
+  left = Equiv _ _ $
+    \x => (\(IsElem _ _ elem) => IsElem _ _ (case elem of Left l => l),
+           \(IsElem _ _ elem) => IsElem _ _ $ Left elem)
+  right = Equiv _ _ $
+    \x => (\(IsElem _ _ elm_prf) => IsElem _ _ (case elm_prf of Right r => r),
+           \(IsElem _ _ elem) => IsElem _ _ $ Right elem)
 
 ||| Set union is commutative up to set equivalence
-unionCommutes : (s1 : Set a) ->
-                (s2 : Set a) ->
+unionCommutes : (s1, s2 : Set a) ->
                 s1 \/ s2 :=: s2 \/ s1
 unionCommutes (MkSet a p) (MkSet a q) =
-  SubsetEq _ _ $ \x => (\(IsElem _ _ elem_prf) => IsElem _ _ $ mirror elem_prf,
-                        \(IsElem _ _ elem_prf) => IsElem _ _ $ mirror elem_prf)
+  Equiv _ _ $ \x => (\(IsElem _ _ elem) => IsElem _ _ $ mirror elem,
+                     \(IsElem _ _ elem) => IsElem _ _ $ mirror elem)
+
+||| The union of two subsets is another subset
+unionPrsSubset : (s1, s2, s3 : Set a) ->
+                 s1 :<: s3 ->
+                 s2 :<: s3 ->
+                 s1 \/ s2 :<: s3
+unionPrsSubset (MkSet _ s1) (MkSet _ s2) (MkSet _ s3)
+               (IsSubset _ _ prf1) (IsSubset _ _ prf2) =
+  IsSubset _ _ $ \x, (IsElem x _ elem) =>
+    case elem of Left l => prf1 x $ IsElem x _ l
+                 Right r => prf2 x $ IsElem x _ r
 
 infixl 6 /\
 ||| Set intersection
 (/\) : Set a -> Set a -> Set a
 (MkSet a p) /\ (MkSet a q) = MkSet a (\x => (p x, q x))
 
+||| The universe is an identity under set intersection
+intersectionEmptyNeutral : (s : Set a) ->
+                           (s /\ Universe a :=: s, Universe a /\ s :=: s)
+intersectionEmptyNeutral (MkSet s prop) = (left, right) where
+  left = Equiv _ _ $
+    \x => (\(IsElem _ _ elem) => IsElem _ _ $ fst elem,
+           \(IsElem _ _ elem) => IsElem _ _ (elem, ()))
+  right = Equiv _ _ $
+    \x => (\(IsElem _ _ elem) => IsElem _ _ $ snd elem,
+           \(IsElem _ _ elem) => IsElem _ _ ((), elem))
+
 ||| Set intersection is commutative up to set equivalence
-intersectionCommutes : (s1 : Set a) ->
-                       (s2 : Set a) ->
+intersectionCommutes : (s1, s2 : Set a) ->
                        s1 /\ s2 :=: s2 /\ s1
 intersectionCommutes (MkSet a p) (MkSet a q) =
-  SubsetEq _ _ $ \x => (\(IsElem _ _ elem_prf) => IsElem _ _ $ swap elem_prf,
-                        \(IsElem _ _ elem_prf) => IsElem _ _ $ swap elem_prf)
+  Equiv _ _ $ \x => (\(IsElem _ _ elem) => IsElem _ _ $ swap elem,
+                     \(IsElem _ _ elem) => IsElem _ _ $ swap elem)
+
+||| The intersection of two subsets is another subset
+intersectionPrsSubset : (s1, s2, s3 : Set a) ->
+                        s1 :<: s3 ->
+                        s2 :<: s3 ->
+                        s1 /\ s2 :<: s3
+intersectionPrsSubset (MkSet _ s1) (MkSet _ s2) (MkSet _ s3)
+                      (IsSubset _ _ prf1) (IsSubset _ _ prf2) =
+  IsSubset _ _ $ \x, (IsElem x _ elem) => prf1 x $ IsElem x _ $ fst elem
 
 infixl 4 ~\
 ||| Set difference
 (~\) : Set a -> Set a -> Set a
-(MkSet a p) ~\ (MkSet a q) = MkSet a (\x => (p x, Not (q x)))
+(MkSet a p) ~\ (MkSet a q) = MkSet a $ \x => (p x, Not $ q x)
+
+infixl 4 /~\
+||| Symmetric difference
+(/~\) : Set a -> Set a -> Set a
+s1 /~\ s2 = (s1 ~\ s2) \/ (s2 ~\ s1)
 
 ||| Negation of p and negation of q implies negation of p or q
 de_morgan_1 : (x : a) ->
-              (s1 : Set a) ->
-              (s2 : Set a) ->
+              (s1, s2 : Set a) ->
               x # compl s1 /\ compl s2 ->
               x # compl (s1 \/ s2)
 de_morgan_1 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
-  IsElem x _ (\y => case y of Left p_prf => fst prf p_prf
-                              Right q_prf => snd prf q_prf)
+  IsElem x _ $ \y => case y of Left p_prf => fst prf p_prf
+                               Right q_prf => snd prf q_prf
 
 ||| Negation of p or q implies negation of p and negation of q
 de_morgan_2 : (x : a) ->
-              (s1 : Set a) ->
-              (s2 : Set a) ->
+              (s1, s2 : Set a) ->
               x # compl (s1 \/ s2) ->
               x # compl s1 /\ compl s2
 de_morgan_2 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
@@ -112,51 +196,62 @@ de_morgan_2 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
 
 ||| Negation of p or negation of q implies negation of p and q
 de_morgan_3 : (x : a) ->
-              (s1 : Set a) ->
-              (s2 : Set a) ->
+              (s1, s2 : Set a) ->
               x # compl s1 \/ compl s2 ->
               x # compl (s1 /\ s2)
 de_morgan_3 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
-  IsElem x _ (\(p_prf,q_prf) => case prf of Left p_contra => p_contra p_prf
-                                            Right q_contra => q_contra q_prf)
+  IsElem x _ $ \(p_prf,q_prf) => case prf of Left p_contra => p_contra p_prf
+                                             Right q_contra => q_contra q_prf
 
 -- De Morgan's 4th law (the converse of the above) is unprovable constructively
 
+||| Set of sets
+Family : (a : Type) -> Type
+Family a = Set $ Set a
+
+||| Data constructor for families
+MkFamily : (a : Type) -> (Set a -> Type) -> Family a
+MkFamily a p = MkSet (Set a) p
+
+equivPrsFamilyMember : (p : Family a) ->
+                       (s : Set a) ->
+                       s # p ->
+                       s :=: s' ->
+                       s' # p
+equivPrsFamilyMember (MkSet _ ps_prop) (MkSet _ s_prop) (IsElem _ _ s) (Equiv _ _ equiv_prf) = ?equivprshole
+
 ||| Set of all subsets
-data Powerset : (s : Set a) ->
-                Set (Set a) ->
+data Powerset : Set a ->
+                Family a ->
                 Type where
-  IsPowerset : (s : Set a) ->
-               (ps : Set (Set a)) ->
+  Pow : (s : Set a) ->
+               (ps : Family a) ->
                ((s' : Set a) ->
                 s' :<: s <-> s' # ps) ->
                Powerset s ps
 
 ||| The powerset is unique up to set equivalence
 powersetUniq : (s : Set a) ->
-               (ps : Set (Set a)) ->
-               (ps' : Set (Set a)) ->
+               (ps, ps' : Family a) ->
                Powerset s ps ->
                Powerset s ps' ->
                ps :=: ps'
 powersetUniq (MkSet a s_prop) (MkSet _ ps_prop) (MkSet _ ps_prop')
-             (IsPowerset _ _ ps_prf) (IsPowerset _ _ ps_prf') =
-  SubsetEq _ _ (\x => (fwd, bwd)) where
-    fwd : x # MkSet (Set a) ps_prop -> x # MkSet (Set a) ps_prop'
-    fwd elem_prf with (ps_prf x, ps_prf' x)
-      | ((_, ps_bwd), (ps_fwd', _)) = ps_fwd' $ ps_bwd elem_prf
-    bwd : x # MkSet (Set a) ps_prop' -> x # MkSet (Set a) ps_prop
-    bwd elem_prf with (ps_prf x, ps_prf' x)
-      | ((ps_fwd, _), (_, ps_bwd')) = ps_fwd $ ps_bwd' elem_prf
+             (Pow _ _ ps_prf) (Pow _ _ ps_prf') =
+  Equiv _ _ (\x => (fwd, bwd)) where
+    fwd : x # MkFamily a ps_prop -> x # MkFamily a ps_prop'
+    fwd elem with (ps_prf x, ps_prf' x)
+      | ((_, ps_bwd), (ps_fwd', _)) = ps_fwd' $ ps_bwd elem
+    bwd : x # MkFamily a ps_prop' -> x # MkFamily a ps_prop
+    bwd elem with (ps_prf x, ps_prf' x)
+      | ((ps_fwd, _), (_, ps_bwd')) = ps_fwd $ ps_bwd' elem
 
 ||| Union of a collection of sets
 unionOver : Vect n (Set a) ->
             Set a
-unionOver [] = MkSet a (\_ => Void) -- Union over empty set is the empty set
-unionOver (x :: xs) = x \/ unionOver xs
+unionOver = foldr (\/) (Empty a)
 
 ||| Intersection of a collection of sets
 intersectionOver : Vect n (Set a) ->
                    Set a
-intersectionOver [] = MkSet a (\_ => ()) -- Intr over empty set is the universe
-intersectionOver (x :: xs) = x /\ intersectionOver xs
+intersectionOver = foldr (/\) (Universe a)
