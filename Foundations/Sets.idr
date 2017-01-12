@@ -117,6 +117,21 @@ unionEmptyNeutral (MkSet s prop) = (left, right) where
     \x => (\(IsElem _ _ elm_prf) => IsElem _ _ (case elm_prf of Right r => r),
            \(IsElem _ _ elem) => IsElem _ _ $ Right elem)
 
+||| Set union is associative up to set equivalence
+unionAssoc : (s1, s2, s3 : Set a) ->
+             s1 \/ (s2 \/ s3) :=: (s1 \/ s2) \/ s3
+unionAssoc (MkSet a s1) (MkSet a s2) (MkSet a s3) = Equiv _ _ exact where  
+  helper1 : Either x (Either y z) -> Either (Either x y) z
+  helper1 (Left l) = Left $ Left l
+  helper1 (Right (Left rl)) = Left $ Right rl
+  helper1 (Right (Right rr)) = Right rr
+  helper2 : Either (Either x y) z -> Either x (Either y z)
+  helper2 (Left (Left ll)) = Left ll
+  helper2 (Left (Right lr)) = Right $ Left lr
+  helper2 (Right r) = Right $ Right r
+  exact x = (\(IsElem _ _ elem) => IsElem _ _ $ helper1 elem,
+             \(IsElem _ _ elem) => IsElem _ _ $ helper2 elem)
+
 ||| Set union is commutative up to set equivalence
 unionCommutes : (s1, s2 : Set a) ->
                 s1 \/ s2 :=: s2 \/ s1
@@ -150,6 +165,15 @@ intersectionEmptyNeutral (MkSet s prop) = (left, right) where
   right = Equiv _ _ $
     \x => (\(IsElem _ _ elem) => IsElem _ _ $ snd elem,
            \(IsElem _ _ elem) => IsElem _ _ ((), elem))
+
+||| Set intersection is associative up to set equivalence
+intersectionAssoc : (s1, s2, s3 : Set a) ->
+                    s1 /\ (s2 /\ s3) :=: (s1 /\ s2) /\ s3
+intersectionAssoc (MkSet a s1) (MkSet a s2) (MkSet a s3) =
+  Equiv _ _ exact where
+    exact x =
+      (\(IsElem x _ (prf1, prf2, prf3)) => IsElem x _ ((prf1, prf2), prf3),
+       \(IsElem x _ ((prf1, prf2), prf3)) => IsElem x _ (prf1, prf2, prf3))
 
 ||| Set intersection is commutative up to set equivalence
 intersectionCommutes : (s1, s2 : Set a) ->
@@ -205,6 +229,26 @@ de_morgan_3 x (MkSet a p) (MkSet a q) (IsElem x _ prf) =
 
 -- De Morgan's 4th law (the converse of the above) is unprovable constructively
 
+||| Set union is distributive over symmetric difference
+unionDistrSymDiff : (s1, s2, s3 : Set a) ->
+                    s1 /\ (s2 /~\ s3) :=: s1 /\ s2 /~\ s1 /\ s3
+unionDistrSymDiff (MkSet a s1) (MkSet a s2) (MkSet a s3) = Equiv _ _ exact where
+  exact x = (\(IsElem x _ elem) => IsElem x _
+              (case elem of
+                    (prf1, Left (prf2, contra3)) => Left ((prf1, prf2),
+                      \(_, prf3) => contra3 prf3)
+                    (prf1, Right (prf3, contra2)) => Right ((prf1, prf3),
+                      \(_, prf2) => contra2 prf2)),
+             \(IsElem x _ elem) => IsElem x _
+              (case elem of
+                    Left ((prf1, prf2), contra13) => (prf1, Left (prf2,
+                      \prf3 => contra13 (prf1, prf3)))
+                    Right ((prf1, prf3), contra12) => (prf1, Right (prf3,
+                      \prf2 => contra12 (prf1, prf2)))))
+-- Above proof is fairly ugly and hard to follow: it looks kind of Lispy, which
+-- is not necessarily a bad thing but not what I want to go for in Idris! I
+-- will fix it up later
+
 ||| Set of sets
 Family : (a : Type) -> Type
 Family a = Set $ Set a
@@ -212,13 +256,6 @@ Family a = Set $ Set a
 ||| Data constructor for families
 MkFamily : (a : Type) -> (Set a -> Type) -> Family a
 MkFamily a p = MkSet (Set a) p
-
-equivPrsFamilyMember : (p : Family a) ->
-                       (s : Set a) ->
-                       s # p ->
-                       s :=: s' ->
-                       s' # p
-equivPrsFamilyMember (MkSet _ ps_prop) (MkSet _ s_prop) (IsElem _ _ s) (Equiv _ _ equiv_prf) = ?equivprshole
 
 ||| Set of all subsets
 data Powerset : Set a ->
