@@ -22,7 +22,9 @@ times_zero_equals_zero : Ring a =>
                          (x : a) ->
                          (Groups.zero <*> x = Groups.zero,
                           x <*> Groups.zero = Groups.zero)
-times_zero_equals_zero x = ?zero_hole
+times_zero_equals_zero x = (lmult, rmult) where
+  lmult = ?lmulthole
+  rmult = ?rmulthole
 
 interface Ring a => IntegralDomain a where                    
   one : a
@@ -35,4 +37,4 @@ interface Ring a => IntegralDomain a where
   no_divs_zero : (x : a) ->
                  (y : a) ->
                  x <*> y = zero ->
-                 Either (x = 0) (y = 0)
+                 Either (x = Groups.zero) (y = Groups.zero)
