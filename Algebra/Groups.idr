@@ -123,20 +123,28 @@ operateEq w x y z w_eq_x y_eq_z =
   in trans wy_eq_xy xy_eq_xz
 
 ||| Inverse of some given element in a group is unique
-negUnique : Group a =>
-            (x : a) ->
-            (x' : a) ->
-            (x <+> x' = Groups.zero,
-            x' <+> x = Groups.zero) ->
-            x' = neg x
-negUnique x x' neg_prf = 
+negUniq : Group a =>
+          (x : a) ->
+          (x' : a) ->
+          (x <+> x' = Groups.zero,
+           x' <+> x = Groups.zero) ->
+          x' = neg x
+negUniq x x' neg_prf = 
   cancelLeft x x' (neg x) $ trans (fst neg_prf) $ sym $ fst $ inverse x
 
 ||| Negating an element is involutive
 doubleNeg : Group a =>
             (x : a) ->
             x = neg (neg x)
-doubleNeg x = negUnique (neg x) x $ swap $ inverse x
+doubleNeg x = negUniq (neg x) x $ swap $ inverse x
+
+||| Negating an element is injective
+negInjective : Group a =>
+               (x : a) ->
+               (y : a) ->
+               neg x = neg y ->
+               x = y
+negInjective x y eq = trans (trans (doubleNeg x) (cong eq)) $ sym $ doubleNeg y
 
 ||| If x is the inverse of y, then y is the inverse of x
 negSym : Group a =>
@@ -145,3 +153,26 @@ negSym : Group a =>
          neg x = x' ->
          x = neg x'
 negSym x x' prf = rewrite doubleNeg x in cong prf
+
+||| If an element and the inverse of another element sum to the identity, they
+||| are in fact the same element
+opZeroEq : Group a =>
+           (x : a) ->
+           (y : a) ->
+           x <+> (neg y) = Groups.zero ->
+           (neg y) <+> x = Groups.zero ->
+           x = y
+opZeroEq x y left_eq right_eq =
+  negInjective x y $ sym $ negUniq x (neg y) (left_eq, right_eq)
+
+||| Like opZeroEq, but assumes Abelian and demands only one equality
+opZeroEqAb : AbelianGroup a =>
+             (x : a) ->
+             (y : a) ->
+             Either (x <+> (neg y) = Groups.zero)
+                    ((neg y) <+> x = Groups.zero)  ->
+             x = y
+opZeroEqAb x y (Left eq) = let eq' = trans (commutativity (neg y) x) eq
+                           in opZeroEq x y eq eq'
+opZeroEqAb x y (Right eq) = let eq' = trans (commutativity x (neg y)) eq
+                            in opZeroEq x y eq' eq

@@ -69,7 +69,7 @@ homNeg : (Group a, Group b) =>
          Homomorphism hom ->
          (x : a) ->
          hom (neg x) = neg (hom x)
-homNeg hom (Hom _ prs) x = negUnique _ _ (left, right) where
+homNeg hom (Hom _ prs) x = negUniq _ _ (left, right) where
   left : hom x <+> hom (neg x) = Groups.zero
   left = rewrite (sym (zeroToZero hom (Hom hom prs))) in
          rewrite (sym (prs x (neg x))) in
