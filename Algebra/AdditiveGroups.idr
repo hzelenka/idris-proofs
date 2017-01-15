@@ -6,7 +6,7 @@ import Foundations.Cardinality
 import NumberTheory.DivisionAlgorithm
 import Data.Fin
 
--- Use the division algorithm to add two Fin n's
+||| Use the division algorithm to add two Fin n's
 fin_add : {n : Nat} ->
           Fin n ->
           Fin n ->
@@ -38,13 +38,3 @@ fin_id : (x : Fin (S n)) ->
          (fin_add x FZ = x, fin_add FZ x = x)
 fin_id x with (fin_add x FZ, fin_add FZ x)
   | (left_prf, right_prf) = (?l_hole, ?r_hole)
-
-{- using (n : Nat)
-  implementation Group (Fin (S n)) where
-    (<+>) = ?fin_add
-    zero = FZ
-    neg = fin_neg
-    associativity x y z = fin_assoc x y z
-    identity x = fin_id x
-    inverse {n} x with (division_algorithm n (finToNat x + finToNat (fin_neg x)))
-    | (q ** r ** (eq_prf, lte_prf)) = ?inv_hole -}

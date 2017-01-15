@@ -29,6 +29,22 @@ interface Group a => AbelianGroup a where
                   (y : a) ->
                   x <+> y = y <+> x
 
+||| Synonym for fst . identity
+leftId : Group a => (x : a) -> x <+> Groups.zero = x
+leftId x = fst $ identity x
+
+||| Synonym for snd . identity
+rightId : Group a => (x : a) -> Groups.zero <+> x = x
+rightId x = snd $ identity x
+
+||| Synonym for fst . inverse
+leftInv : Group a => (x : a) -> x <+> neg x = Groups.zero
+leftInv x = fst $ inverse x
+
+||| Synonym for snd . inverse
+rightInv : Group a => (x : a) -> neg x <+> x = Groups.zero
+rightInv x = snd $ inverse x
+
 infixr 8 <^>
 ||| Apply the group operation an arbitrary number of times
 (<^>) : Group a => a -> Nat -> a
@@ -40,7 +56,7 @@ powerOfZero : Group a =>
               (n : Nat) ->
               (zero {a}) <^> n = zero {a}
 powerOfZero Z = Refl
-powerOfZero {a} (S k) = rewrite powerOfZero {a} k in fst $ identity zero
+powerOfZero {a} (S k) = rewrite powerOfZero {a} k in leftId zero
 
 ||| The identity element in a group is unique
 idUniq : Group a =>
@@ -49,7 +65,7 @@ idUniq : Group a =>
           (x <+> z' = x,
            z' <+> x = x)) ->
          Groups.zero = z'
-idUniq z' prf = trans (sym (fst (prf zero))) $ snd $ identity z'
+idUniq z' prf = trans (sym (fst (prf zero))) $ rightId z'
 
 ||| Rewrite left associativity to right associativity
 lassoc : Group a =>
@@ -77,9 +93,9 @@ cancelLeft : Group a =>
 cancelLeft x y z xy_eq_xz =
   let left     = lassoc (neg x) x y
       right    = lassoc (neg x) x z
-      elim_inv = sym $ snd $ inverse x
-      elim_e_l = sym $ snd $ identity y
-      elim_e_r = sym $ snd $ identity z in
+      elim_inv = sym $ rightInv x
+      elim_e_l = sym $ rightId y
+      elim_e_r = sym $ rightId z in
       rewrite elim_e_l in
       rewrite elim_e_r in
       rewrite elim_inv in
@@ -97,9 +113,9 @@ cancelRight : Group a =>
 cancelRight x y z yx_eq_zx =
   let left     = rassoc y x (neg x)
       right    = rassoc z x (neg x)
-      elim_inv = sym $ fst $ inverse x
-      elim_e_l = sym $ fst $ identity y
-      elim_e_r = sym $ fst $ identity z in
+      elim_inv = sym $ leftInv x
+      elim_e_l = sym $ leftId y
+      elim_e_r = sym $ leftId z in
       rewrite elim_e_l in
       rewrite elim_e_r in
       rewrite elim_inv in
@@ -130,7 +146,7 @@ negUniq : Group a =>
            x' <+> x = Groups.zero) ->
           x' = neg x
 negUniq x x' neg_prf = 
-  cancelLeft x x' (neg x) $ trans (fst neg_prf) $ sym $ fst $ inverse x
+  cancelLeft x x' (neg x) $ trans (fst neg_prf) $ sym $ leftInv x
 
 ||| Negating an element is involutive
 doubleNeg : Group a =>
