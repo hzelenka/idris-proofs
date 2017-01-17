@@ -2,6 +2,7 @@ module Main
 
 -- I'll add an ipkg et al later, which is better than importing everything
 import Algebra.AdditiveGroups
+import Algebra.BooleanRings
 import Algebra.Cyclics
 import Algebra.FreeGroups
 import Algebra.Groups

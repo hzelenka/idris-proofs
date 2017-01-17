@@ -15,7 +15,7 @@ fin_add {n=Z} x y = FinZElim x
 fin_add {n=S k} x y =
   let x' = finToNat x
       y' = finToNat y
-      (_ ** r ** (_, lte_prf)) = division_algorithm k (x' + y')
+      (_ ** r ** (_, lte_prf)) = divisionAlgorithm k (x' + y')
   in nat_to_fin r k lte_prf
 
 -- Will probably need to use a view later to satisfy the totality checker

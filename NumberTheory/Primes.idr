@@ -24,24 +24,24 @@ get_k : m // n -> Nat
 get_k (Divides _ _ k _) = k
 
 ||| If m divides n, k is the quotient and zero is the remainder
-divides_quo_rem : (m : Nat) ->
+dividesQuoRem : (m : Nat) ->
                   (n : Nat) ->
                   (prf : S m // n) ->
                   (quotient m n = get_k prf, remainder m n = Z)
-divides_quo_rem m n (Divides m n k eq_prf) =
+dividesQuoRem m n (Divides m n k eq_prf) =
   (\(a,b) => (sym a, sym b)) $
-  division_alg_unique m n k Z exact LTEZero where
+  divAlgUniq m n k Z exact LTEZero where
     exact : n = k * S m + 0
     exact = rewrite plusZeroRightNeutral (k * S m) in
             rewrite multCommutative k (S m) in
             sym eq_prf
 
-||| divides_quo_rem in reverse
-quo_rem_divides : (m : Nat) ->
+||| dividesQuoRem in reverse
+quoRemDivides : (m : Nat) ->
                   (n : Nat) ->
                   remainder m n = Z ->
                   S m // n
-quo_rem_divides m n rem_prf with (division_algorithm m n)
+quoRemDivides m n rem_prf with (divisionAlgorithm m n)
   | (q ** Z ** (eq_prf, lte_prf)) = Divides m n q exact where
     lemma : q + q * m = q * S m + 0
     lemma = rewrite plusZeroRightNeutral (q * S m) in
@@ -52,46 +52,46 @@ quo_rem_divides m n rem_prf with (division_algorithm m n)
   | (q ** S k ** (eq_prf, lte_prf)) = absurd $ SIsNotZ rem_prf
 
 ||| Whether m divides n is decidable
-dec_divides : (m : Nat) ->
+decDivides : (m : Nat) ->
               (n : Nat) ->
               Dec (m // n)
-dec_divides Z n = No absurd
-dec_divides (S m) n with (decEq (remainder m n) Z)
-  | Yes eq = Yes $ quo_rem_divides m n eq
-  | No ineq = No $ (\div_prf => ineq (snd (divides_quo_rem m n div_prf)))
+decDivides Z n = No absurd
+decDivides (S m) n with (decEq (remainder m n) Z)
+  | Yes eq = Yes $ quoRemDivides m n eq
+  | No ineq = No $ (\div_prf => ineq (snd (dividesQuoRem m n div_prf)))
 
 ||| Multiplication by a natural number greater than zero preserves reflexivity
-lte_mult : (m : Nat) ->
+lteMult : (m : Nat) ->
            (n : Nat) ->
            LTE m (m * S n)
-lte_mult m Z = rewrite multOneRightNeutral m in lteRefl
-lte_mult m (S k) =
-  let rec = lte_mult m k in
+lteMult m Z = rewrite multOneRightNeutral m in lteRefl
+lteMult m (S k) =
+  let rec = lteMult m k in
   lteTransitive rec $
   rewrite multRightSuccPlus m (S k) in
   rewrite plusCommutative m (m * (S k)) in
   lteAddRight $ m * S k
 
 ||| Can't have two numbers both less than one another
-two_ltes_contra : (m : Nat) ->
+twoLTEsContra : (m : Nat) ->
                   (n : Nat) ->
                   LTE (S m) n ->
                   LTE n m ->
                   Void
-two_ltes_contra Z (S k) lte_1 lte_2 = absurd lte_2
-two_ltes_contra (S k) n lte_1 lte_2 =
-  absurd $ not_succ_lte (S k) $ lteTransitive lte_1 lte_2
+twoLTEsContra Z (S k) lte_1 lte_2 = absurd lte_2
+twoLTEsContra (S k) n lte_1 lte_2 =
+  absurd $ notSuccLTE (S k) $ lteTransitive lte_1 lte_2
 
 ||| A divisor of a number must be less than the number it divides
-only_lte_divides : (m : Nat) ->
+onlyLteDivides : (m : Nat) ->
                    (n : Nat) ->
                    GT m n ->
                    Not (S m // S n)
-only_lte_divides Z _ gt_prf (Divides _ _ _ _) impossible
-only_lte_divides (S j) n gt_prf (Divides _ _ Z k_prf) =
+onlyLteDivides Z _ gt_prf (Divides _ _ _ _) impossible
+onlyLteDivides (S j) n gt_prf (Divides _ _ Z k_prf) =
   absurd $ SIsNotZ $ trans (sym k_prf) $ multZeroRightZero j
-only_lte_divides (S j) n gt_prf (Divides _ _ (S k) k_prf) =
-  two_ltes_contra j n exact $ fromLteSucc gt_prf where
+onlyLteDivides (S j) n gt_prf (Divides _ _ (S k) k_prf) =
+  twoLTEsContra j n exact $ fromLteSucc gt_prf where
     exact : LTE (S j) n
     exact = ?exacthole $
             succInjective _ _ k_prf
