@@ -12,9 +12,7 @@ interface Group a where
   (<+>) : a -> a -> a
   zero : a
   neg : a -> a
-  associativity : (x : a) ->
-                  (y : a) ->
-                  (z : a) ->
+  associativity : (x, y, z : a) ->
                   (x <+> y) <+> z = x <+> (y <+> z)
   identity : (x : a) ->
              (x <+> zero = x,
@@ -25,8 +23,7 @@ interface Group a where
 
 ||| Group with added requirement of commutativity
 interface Group a => AbelianGroup a where
-  commutativity : (x : a) ->
-                  (y : a) ->
+  commutativity : (x, y : a) ->
                   x <+> y = y <+> x
 
 ||| Synonym for fst . identity
@@ -69,25 +66,19 @@ idUniq z' prf = trans (sym (fst (prf zero))) $ rightId z'
 
 ||| Rewrite left associativity to right associativity
 lassoc : Group a =>
-         (x : a) ->
-         (y : a) ->
-         (z : a) ->
+         (x, y, z : a) ->
          (x <+> y) <+> z = x <+> (y <+> z)
 lassoc x y z = associativity x y z
 
 ||| Rewrite right associativity to left associativity
 rassoc : Group a =>
-         (x : a) ->
-         (y : a) ->
-         (z : a) ->
+         (x, y, z : a) ->
          x <+> (y <+> z) = (x <+> y) <+> z
 rassoc x y z = sym $ associativity x y z
 
 ||| Eliminate an element left-operated on both sides of an equality
 cancelLeft : Group a =>
-             (x : a) ->
-             (y : a) ->
-             (z : a) ->
+             (x, y, z : a) ->
              x <+> y = x <+> z ->
              y = z
 cancelLeft x y z xy_eq_xz =
@@ -105,9 +96,7 @@ cancelLeft x y z xy_eq_xz =
 
 ||| Eliminate an element right-operated on both sides of an equality
 cancelRight : Group a =>
-              (x : a) ->
-              (y : a) ->
-              (z : a) ->
+              (x, y, z : a) ->
               y <+> x = z <+> x ->
               y = z
 cancelRight x y z yx_eq_zx =
@@ -126,10 +115,7 @@ cancelRight x y z yx_eq_zx =
 
 ||| Operate two equalities together
 operateEq : Group a =>
-             (w : a) ->
-             (x : a) ->
-             (y : a) ->
-             (z : a) ->
+             (w, x, y, z : a) ->
              w = x ->
              y = z ->
              w <+> y = x <+> z
@@ -140,13 +126,22 @@ operateEq w x y z w_eq_x y_eq_z =
 
 ||| Inverse of some given element in a group is unique
 negUniq : Group a =>
-          (x : a) ->
-          (x' : a) ->
+          (x, x' : a) ->
           (x <+> x' = Groups.zero,
            x' <+> x = Groups.zero) ->
           x' = neg x
 negUniq x x' neg_prf = 
   cancelLeft x x' (neg x) $ trans (fst neg_prf) $ sym $ leftInv x
+
+||| Like negUniq, but assumes Abelian and demands only one equality
+negUniqAb : AbelianGroup a => -- this works for any kind of group, shh
+            (x, x' : a) ->
+            Either (x <+> x' = Groups.zero) (x' <+> x = Groups.zero) ->
+            x' = neg x
+negUniqAb x x' (Left neg_prf) =
+  cancelLeft x x' (neg x) $ trans neg_prf $ sym $ leftInv x
+negUniqAb x x' (Right neg_prf) = cancelLeft x x' (neg x) $
+  trans (trans (commutativity x x') neg_prf) $ sym $ leftInv x
 
 ||| Negating an element is involutive
 doubleNeg : Group a =>
@@ -156,16 +151,14 @@ doubleNeg x = negUniq (neg x) x $ swap $ inverse x
 
 ||| Negating an element is injective
 negInjective : Group a =>
-               (x : a) ->
-               (y : a) ->
+               (x, y : a) ->
                neg x = neg y ->
                x = y
 negInjective x y eq = trans (trans (doubleNeg x) (cong eq)) $ sym $ doubleNeg y
 
 ||| If x is the inverse of y, then y is the inverse of x
 negSym : Group a =>
-         (x : a) ->
-         (x' : a) ->
+         (x, x' : a) ->
          neg x = x' ->
          x = neg x'
 negSym x x' prf = rewrite doubleNeg x in cong prf
@@ -173,8 +166,7 @@ negSym x x' prf = rewrite doubleNeg x in cong prf
 ||| If an element and the inverse of another element sum to the identity, they
 ||| are in fact the same element
 opZeroEq : Group a =>
-           (x : a) ->
-           (y : a) ->
+           (x, y : a) ->
            x <+> (neg y) = Groups.zero ->
            (neg y) <+> x = Groups.zero ->
            x = y
@@ -183,8 +175,7 @@ opZeroEq x y left_eq right_eq =
 
 ||| Like opZeroEq, but assumes Abelian and demands only one equality
 opZeroEqAb : AbelianGroup a =>
-             (x : a) ->
-             (y : a) ->
+             (x, y : a) ->
              Either (x <+> (neg y) = Groups.zero)
                     ((neg y) <+> x = Groups.zero)  ->
              x = y
