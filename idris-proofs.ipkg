@@ -1,0 +1,34 @@
+package IdrisProofs
+
+modules = Algebra.AdditiveGroups,
+          Algebra.BooleanRings,
+          Algebra.Cyclics,
+          Algebra.FreeGroups,
+          Algebra.Groups,
+          Algebra.Homomorphisms,
+          Algebra.Rings,
+          Algebra.Subgroups,
+
+          Categories.Definitions,
+          Categories.Groupoids,
+          Categories.Products,
+          Categories.UniversalProps,
+
+          Foundations.Cardinality,
+          Foundations.Combinatorics,
+          Foundations.Composition,
+          Foundations.DecSets,
+          Foundations.Equivalence,
+          Foundations.Functions,
+          Foundations.Relations,
+          Foundations.Sets,
+          Foundations.Subvectors,
+
+          NumberTheory.Church,
+          NumberTheory.DivisionAlgorithm,
+          NumberTheory.Primes,
+
+          Topology.Definitions
+
+sourcedir = src
+main = Main
