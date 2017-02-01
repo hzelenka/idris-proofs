@@ -1,11 +1,11 @@
 package IdrisProofs
 
-modules = Algebra.AdditiveGroups,
-          Algebra.BooleanRings,
-          Algebra.Cyclics,
+modules = Algebra.BooleanRings,
+          Algebra.Fields,
           Algebra.FreeGroups,
           Algebra.Groups,
           Algebra.Homomorphisms,
+          Algebra.Polynomials,
           Algebra.Rings,
           Algebra.Subgroups,
 
@@ -15,14 +15,12 @@ modules = Algebra.AdditiveGroups,
           Categories.UniversalProps,
 
           Foundations.Cardinality,
-          Foundations.Combinatorics,
           Foundations.Composition,
           Foundations.DecSets,
           Foundations.Equivalence,
           Foundations.Functions,
           Foundations.Relations,
           Foundations.Sets,
-          Foundations.Subvectors,
 
           NumberTheory.Church,
           NumberTheory.DivisionAlgorithm,

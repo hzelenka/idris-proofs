@@ -27,6 +27,18 @@ interface Category obj where
               (f `catComp` (catId o2) = f,
                (catId o1) `catComp` f = f)
 
+||| There is only one identity arrow for each object
+idUniq : Category obj =>
+         (o : obj) ->
+         (id' : mor o o) ->
+         Either ((f : mor o o') ->
+                 catComp {obj} id' f = f)
+                ((f : mor o' o) ->
+                 catComp {obj} f id' = f) ->
+         id' = catId o
+idUniq {obj = obj} o id' (Left prf) = ?iduniqhole_1
+idUniq {obj = obj} o id' (Right prf) = ?iduniqhole_2
+
 ||| Left-cancellable morphism
 data Monomorphism : Category obj =>
                     {o1, o2 : obj} ->
