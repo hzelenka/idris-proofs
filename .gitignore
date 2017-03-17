@@ -1,2 +1,4 @@
 *.ibc
 *~
+*.config
+.cabal-sandbox

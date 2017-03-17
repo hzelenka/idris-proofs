@@ -80,3 +80,15 @@ homNeg hom (Hom _ prs) x = negUniq _ _ (left, right) where
           rewrite sym (prs (neg x) x) in
           rewrite rightInv x in
           Refl
+
+||| Homomorphisms preserve powers
+homPow : (Group a, Group b) =>
+         (hom : (a -> b)) ->
+         Homomorphism hom ->
+         (x : a) ->
+         (m : Nat) ->
+         hom (x <^> m) = hom x <^> m
+homPow hom hom_prf x Z = zeroToZero hom hom_prf
+homPow hom hom_prf@(Hom hom prs) x (S k) =
+  let rec = homPow hom hom_prf x k
+  in rewrite sym rec in trans (prs x (x <^> k)) Refl

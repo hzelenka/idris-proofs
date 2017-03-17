@@ -27,6 +27,24 @@ interface Category obj where
               (f `catComp` (catId o2) = f,
                (catId o1) `catComp` f = f)
 
+fromLteSuccInj : (m, n : Nat) ->
+                 (p1, p2 : LTE (S m) (S n)) ->
+                 fromLteSucc p1 = fromLteSucc p2 ->
+                 p1 = p2
+fromLteSuccInj Z Z (LTESucc LTEZero) (LTESucc LTEZero) eq = Refl
+fromLteSuccInj Z (S k) (LTESucc x) (LTESucc y) eq = cong eq
+fromLteSuccInj (S k) Z p1 p2 eq = absurd $ fromLteSucc p1
+fromLteSuccInj (S k) (S j) (LTESucc x) (LTESucc y) eq = cong eq
+
+lteMereProp : (m, n : Nat) ->
+              (p1, p2 : LTE m n) ->
+              p1 = p2
+lteMereProp Z n LTEZero LTEZero = Refl
+lteMereProp (S k) Z p1 p2 = absurd p1
+lteMereProp (S k) (S j) p1 p2 =
+  let rec = lteMereProp k j (fromLteSucc p1) (fromLteSucc p2)
+  in fromLteSuccInj k j p1 p2 rec
+
 ||| There is only one identity arrow for each object
 idUniq : Category obj =>
          (o : obj) ->
@@ -145,7 +163,7 @@ data Isomorphism : Category obj =>
         Section {obj} f g ->
         Retraction {obj} f g ->
         Isomorphism {obj} f
-
+{-
 ||| Get the inverse out of an isomorphism
 invIso : Category obj =>
          {o1, o2 : obj} ->
@@ -170,3 +188,4 @@ invIsoUniq {obj} f (Iso f g sect (Retr f g retr)) g' (Sect f g' sect') retr' =
       step4 = trans step3 $ cong {f=\val=>catComp {obj} val g'} $ retr
       step5 = trans step4 $ snd $ catIdIsId {obj} g'
   in sym step5
+  -}

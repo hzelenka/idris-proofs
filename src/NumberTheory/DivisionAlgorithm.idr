@@ -10,6 +10,7 @@ lteSuccEq : (m : Nat) ->
             m = S n
 lteSuccEq Z n lte_contra lte_prf = absurd $ lte_contra LTEZero
 lteSuccEq (S Z) Z lte_contra lte_prf = Refl
+lteSuccEq (S (S k)) Z lte_contra lte_prf = absurd $ fromLteSucc lte_prf
 lteSuccEq (S k) (S j) lte_contra lte_prf =
   let rec = lteSuccEq k j (\x => lte_contra (LTESucc x))
                               (fromLteSucc lte_prf)
