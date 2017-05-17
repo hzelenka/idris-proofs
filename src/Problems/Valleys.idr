@@ -21,56 +21,132 @@ data Valley : Nat -> (Nat -> Nat) -> Nat -> Type where
          f (S n) = f n ->
          Valley (S m) f (S n)
 
+lteNeqLT : (m, n : Nat) ->
+           LTE m n ->
+           (m = n -> Void) ->
+           LT m n
+lteNeqLT Z Z lte neq = absurd $ neq Refl
+lteNeqLT Z (S k) lte neq = LTESucc LTEZero
+lteNeqLT (S k) Z lte neq impossible
+lteNeqLT (S k) (S j) lte neq =
+  LTESucc $ lteNeqLT k j (fromLteSucc lte) (\eq => neq (cong eq))
+
+bothLTEEq : (m, n : Nat) ->
+            LTE m n ->
+            LTE n m ->
+            m = n
+bothLTEEq Z Z _ _ = Refl
+bothLTEEq Z (S k) lte1 lte2 impossible
+bothLTEEq (S k) Z lte1 lte2 impossible
+bothLTEEq (S k) (S j) lte1 lte2 =
+  cong {f=S} $ bothLTEEq k j (fromLteSucc lte1) (fromLteSucc lte2)
+
+eitherValleySmaller : (f : Nat -> Nat) ->
+                      Decreasing f ->
+                      (f_Z : Nat) ->
+                      f Z = f_Z ->
+                      (m : Nat) ->
+                      Either (Valley (S m) f m) (LT (f m) f_Z)
+eitherValleySmaller f (Decr f decr) f_Z f_Z_eq Z = Left $ ValZ f Z
+eitherValleySmaller f (Decr f decr) f_Z f_Z_eq (S k)
+  with (eitherValleySmaller f (Decr f decr) f_Z f_Z_eq k)
+    | Right lt    = Right $ lteTransitive (LTESucc (decr k (S k)
+                            (lteSuccRight lteRefl))) lt
+    | Left valley with (decEq (f (S k)) (f k))
+      | Yes eq = Left $ ValS valley eq
+      | No neq = rewrite sym f_Z_eq in
+                 Right $ lteNeqLT _ _ (decr Z (S k) LTEZero) $
+                 \eq => neq $ bothLTEEq (f (S k)) (f k) (decr k (S k)
+                              (lteSuccRight lteRefl)) $
+                              rewrite eq in decr 0 k LTEZero
+
 lteZeroIsZero : (m : Nat) ->
                 LTE m Z ->
                 m = Z
-lteZeroIsZero Z prf = Refl
+lteZeroIsZero Z _ = Refl
 
-valleyFromZ : (f : Nat -> Nat) ->
-              Decreasing f ->
-              f Z = Z ->
-              (m : Nat) ->
-              Valley (S m) f m
-valleyFromZ f _ eq Z = ValZ f Z
-valleyFromZ f (Decr f decr_prf) eq (S k) = ValS rec f_Sk_eq_f_k where
-  rec = valleyFromZ f (Decr f decr_prf) eq k
-  f_Sk_eq_f_k : f (S k) = f k
-  f_Sk_eq_f_k with (k)
-    | Z = trans (lteZeroIsZero (f 1) (rewrite sym eq in ?ltehole)) $ sym eq
-    | S k' = trans f_S_S_k_Z (sym f_S_k_Z) where
-      f_S_S_k_Z : f (S (S k')) = Z
-      f_S_S_k_Z = lteZeroIsZero (f (S (S k'))) $
-                  rewrite sym eq in decr_prf 0 (S (S k')) LTEZero
-      f_S_k_Z : f (S k') = Z
-      f_S_k_Z = lteZeroIsZero (f (S k')) $
-                rewrite sym eq in decr_prf 0 (S k') LTEZero
+decrZConst : (f : Nat -> Nat) ->
+             Decreasing f ->
+             f Z = Z ->
+             (m : Nat) ->
+             f m = Z
+decrZConst f (Decr f decr) eq k =
+  lteZeroIsZero (f k) $ rewrite sym eq in decr 0 k LTEZero
 
-shiftValley : (f : Nat -> Nat) ->
-              (m, n, p : Nat) ->
-              Valley m ((p+) . f) n ->
-              Valley m f (p+n)
-shiftValley f m n Z valley = valley
-shiftValley f (S Z) n (S k) (ValZ _ _) = ValZ f $ S (k + n)
-shiftValley f (S m) (S n) (S k) (ValS valley eq) =
- let rec = shiftValley f m n (S k) valley in
-        ?shiftvalley_2 $ ValS rec ?eqhole
+baseCase : (f : Nat -> Nat) ->
+           Decreasing f ->
+           f Z = Z ->
+           (m : Nat) ->
+           Valley (S m) f m
+baseCase f _ eq Z = ValZ f Z
+baseCase f (Decr f decr) eq (S k) =
+  let rec = baseCase f (Decr f decr) eq k
+  in ValS rec $ trans (decrZConst f (Decr f decr) eq (S k)) $
+                sym (decrZConst f (Decr f decr) eq k)
 
-alwaysExistsValley' : (f : Nat -> Nat) ->
-                      Decreasing f ->
-                      (m : Nat) ->
-                      (f_Z : Nat ** f Z = f_Z) ->
-                      (n : Nat ** Valley (S m) f n)
-alwaysExistsValley' f decr m (Z ** z_prf) = (m ** valleyFromZ f decr z_prf m)
-alwaysExistsValley' f decr Z (S k ** s_k_prf) = (Z ** ValZ f Z)
-alwaysExistsValley' f decr (S j) (S k ** s_k_prf)
-  with (alwaysExistsValley' f decr j (S k ** s_k_prf))
-    | (n ** valley_n) with (decEq (f (S n)) (f n))
-      | Yes prf = (S n ** ValS valley_n prf)
-      | No contra = let Decr f decr_prf = decr
-                    in ?valleyhole
+inductiveStep : (limit : Nat) ->
+                ((f : Nat -> Nat) ->
+                  Decreasing f ->
+                  (k : Nat) ->
+                  LTE k limit ->
+                  f Z = k ->
+                  (m : Nat) ->
+                  (n : Nat ** Valley (S m) f n)) ->
+                (g : Nat -> Nat) ->
+                Decreasing g ->
+                (m : Nat) ->
+                g Z = S limit ->
+                (n : Nat ** Valley (S m) g n)
+inductiveStep limit inductive g decr m eq with (eitherValleySmaller g decr (g Z) Refl m)
+  | Left val = (m ** val)
+  | Right lt = let (rec ** rec_prf) = inductive (g . (m+)) ?decreasinghole (g m)
+                                      (fromLteSucc (rewrite sym eq in lt))
+                                      (cong {f=g} (plusZeroRightNeutral m)) m
+               in (m + rec ** ?righthole1)
 
-alwaysExistsValley : (f : Nat -> Nat) ->
-                     Decreasing f ->
-                     (m : Nat) ->
-                     (n : Nat ** Valley (S m) f n)
-alwaysExistsValley f decr m = alwaysExistsValley' f decr m $ (f 0 ** Refl)
+StrongInductionHolds : Nat -> Type
+StrongInductionHolds n = (p : Nat -> Type) ->
+                         (j : Nat) ->
+                         LTE j n ->
+                         p Z ->
+                         ((limit : Nat) ->
+                          ((m : Nat) ->
+                          LTE m limit ->
+                          p m) ->
+                          p (S limit)) ->
+                         p j
+
+strongInductionHoldsBase : StrongInductionHolds Z
+strongInductionHoldsBase p Z _ base _ = base
+
+strongInductionInductive : (q : Nat) ->
+                           StrongInductionHolds q ->
+                           StrongInductionHolds (S q)
+strongInductionInductive q ind_q p Z lte base inductive = base
+strongInductionInductive q strong_ind_q p (S k) lte base ind_s_q =
+  ind_s_q k $ \m, lte' => strong_ind_q p m (lteTransitive lte' (fromLteSucc lte)) base $ \limit, ind => ind_s_q limit ind
+
+strongInductionAllN : (n : Nat) ->
+                      StrongInductionHolds n
+strongInductionAllN Z = strongInductionHoldsBase
+strongInductionAllN (S k) = strongInductionInductive k $ strongInductionAllN k
+
+strongInduction : (p : Nat -> Type) ->
+                  (n : Nat) ->
+                  p Z ->
+                  ((limit : Nat) ->
+                   ((m : Nat) ->
+                    LTE m limit ->
+                    p m) ->
+                    p (S limit)) ->
+                  p n
+strongInduction p n base inductive =
+  let strongInductionPrf = strongInductionAllN n
+  in strongInductionPrf p n lteRefl base inductive
+
+alwaysValley : (f : Nat -> Nat) ->
+               Decreasing f ->
+               (m, f_Z : Nat) ->
+               f Z = f_Z ->
+               (n : Nat ** Valley (S m) f n)
+
